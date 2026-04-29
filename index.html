@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#1a56db"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="DSM Shift"/>
+<link rel="manifest" href="manifest.json"/>
+<title>DSM Shift Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#1a56db;--blue-light:#eff4ff;--blue-dark:#1341b3;
+  --green:#057a55;--green-light:#ecfdf5;
+  --red:#e02424;--red-light:#fdf2f2;
+  --amber:#d97706;--amber-light:#fffbeb;
+  --gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
+  --gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;
+  --gray-700:#374151;--gray-900:#111827;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:var(--gray-900);background:var(--gray-50);min-height:100vh}
+.screen{display:none;min-height:100vh;padding-bottom:80px}
+.screen.active{display:block}
+
+/* Header */
+.hdr{background:var(--blue);color:#fff;padding:14px 16px 10px;position:sticky;top:0;z-index:50}
+.hdr h1{font-size:17px;font-weight:600;letter-spacing:.01em}
+.hdr p{font-size:12px;opacity:.8;margin-top:2px}
+
+/* Bottom Nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--gray-200);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.bnav button{flex:1;border:none;background:none;padding:10px 4px 8px;cursor:pointer;color:var(--gray-400);font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.15s}
+.bnav button svg{width:22px;height:22px;stroke-width:1.7}
+.bnav button.active{color:var(--blue)}
+.bnav button span{font-weight:500}
+
+/* Cards */
+.card{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:16px;margin:12px 12px 0;box-shadow:var(--shadow)}
+.card-title{font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+
+/* Form elements */
+label{display:block;font-size:13px;font-weight:500;color:var(--gray-700);margin-bottom:4px}
+input[type=text],input[type=number],select{width:100%;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);padding:10px 12px;font-size:15px;background:#fff;transition:.15s;outline:none;-webkit-appearance:none}
+input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.12)}
+.field{margin-bottom:14px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:var(--radius-sm);padding:11px 18px;font-size:15px;font-weight:500;cursor:pointer;transition:.15s;width:100%}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:active{background:var(--blue-dark)}
+.btn-secondary{background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-300)}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-sm{padding:7px 12px;font-size:13px;width:auto}
+
+/* Tags/Badges */
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:12px;font-weight:500}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-red{background:var(--red-light);color:var(--red)}
+
+/* Nozzle grid */
+.nozzle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nozzle-card{border:2px solid var(--gray-200);border-radius:var(--radius);padding:12px;cursor:pointer;transition:.15s;background:#fff;text-align:center}
+.nozzle-card.selected{border-color:var(--blue);background:var(--blue-light)}
+.nozzle-card h3{font-size:16px;font-weight:700;color:var(--blue)}
+.nozzle-card p{font-size:12px;color:var(--gray-500);margin-top:2px}
+
+/* Meter row */
+.meter-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--gray-100)}
+.meter-row:last-child{border:none}
+.meter-label{flex:0 0 80px;font-size:13px;font-weight:600;color:var(--gray-700)}
+.meter-input{flex:1}
+.meter-input input{font-size:16px;font-weight:500;text-align:right}
+
+/* Denomination calculator */
+.denom-row{display:grid;grid-template-columns:80px 1fr 90px;gap:8px;align-items:center;padding:6px 0}
+.denom-label{font-size:14px;font-weight:600;color:var(--gray-700)}
+.denom-total{font-size:14px;font-weight:600;text-align:right;color:var(--green)}
+
+/* Summary tiles */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:14px;text-align:center}
+.tile-val{font-size:22px;font-weight:700;color:var(--gray-900);margin-bottom:2px}
+.tile-label{font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em}
+
+/* Cash deposit log */
+.deposit-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100)}
+.deposit-item:last-child{border:none}
+
+/* Reconcile */
+.recon-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100)}
+.recon-row:last-child{border:none}
+.recon-key{font-size:14px;color:var(--gray-700)}
+.recon-val{font-size:15px;font-weight:600}
+.match-box{padding:16px;border-radius:var(--radius);text-align:center;font-size:17px;font-weight:700;margin-top:8px}
+.match-ok{background:var(--green-light);color:var(--green)}
+.match-diff{background:var(--red-light);color:var(--red)}
+
+/* Log table */
+.log-table{width:100%;border-collapse:collapse;font-size:13px}
+.log-table th{background:var(--gray-50);padding:8px 10px;text-align:left;font-weight:600;color:var(--gray-500);border-bottom:1px solid var(--gray-200)}
+.log-table td{padding:8px 10px;border-bottom:1px solid var(--gray-100)}
+
+/* Alert */
+.alert{padding:12px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:12px}
+.alert-blue{background:var(--blue-light);color:var(--blue-dark);border:1px solid #c3d3f7}
+.alert-green{background:var(--green-light);color:var(--green)}
+.alert-red{background:var(--red-light);color:var(--red)}
+
+/* Section header */
+.section-hdr{padding:16px 12px 6px;font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.06em}
+
+/* Toggle checkbox */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.toggle{width:44px;height:26px;background:var(--gray-300);border-radius:13px;position:relative;cursor:pointer;transition:.2s;border:none}
+.toggle.on{background:var(--blue)}
+.toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle.on::after{left:21px}
+
+/* MPD selector */
+.mpd-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.mpd-pill{padding:8px 16px;border-radius:20px;border:2px solid var(--gray-200);background:#fff;cursor:pointer;font-size:14px;font-weight:500;transition:.15s}
+.mpd-pill.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
+
+/* Shift status bar */
+.shift-bar{background:var(--green-light);border:1px solid #a7f3d0;border-radius:var(--radius);padding:10px 14px;margin:12px 12px 0;display:flex;align-items:center;justify-content:space-between}
+.shift-bar.inactive{background:var(--gray-100);border-color:var(--gray-200)}
+
+/* Timestamps */
+.ts{font-size:11px;color:var(--gray-400)}
+
+/* Number keyboard feel for meters */
+.num-display{font-size:24px;font-weight:700;color:var(--gray-900);padding:14px 16px;background:var(--gray-50);border:2px solid var(--gray-200);border-radius:var(--radius);text-align:right;letter-spacing:.02em;margin-bottom:6px;min-height:58px}
+.num-display.has-value{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark)}
+
+/* Scrollable area */
+.scroll-area{overflow-y:auto;-webkit-overflow-scrolling:touch}
+</style>
+</head>
+<body>
+
+<!-- SCREEN: Home / Shift Start -->
+<div id="screen-home" class="screen active">
+  <div class="hdr">
+    <h1>DSM Shift Manager</h1>
+    <p id="hdr-date"></p>
+  </div>
+  <div id="home-no-shift">
+    <div class="card">
+      <div class="card-title">Start New Shift</div>
+      <div class="field">
+        <label>Select DSM</label>
+        <select id="sel-dsm"></select>
+      </div>
+      <div class="field">
+        <label>Select MPD</label>
+        <div class="mpd-pills" id="mpd-pills"></div>
+      </div>
+      <div class="field">
+        <label>Select Nozzles to Operate</label>
+        <div class="nozzle-grid" id="nozzle-select-grid"></div>
+      </div>
+      <div id="opening-meters-section" style="display:none">
+        <div class="card-title" style="margin-top:16px">Opening Meter Readings</div>
+        <div id="opening-meters-inputs"></div>
+        <div class="field" style="margin-top:8px">
+          <label>Shift Date</label>
+          <input type="date" id="shift-date"/>
+        </div>
+        <button class="btn btn-primary" id="btn-start-shift" style="margin-top:8px">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
+          Start Shift
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Current Rates</div>
+      <div id="current-rates-display"></div>
+    </div>
+  </div>
+  <div id="home-active-shift" style="display:none">
+    <div class="shift-bar">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--green)">Shift Active</div>
+        <div class="ts" id="shift-active-info"></div>
+      </div>
+      <span class="badge badge-green">Running</span>
+    </div>
+    <div class="card">
+      <div class="card-title">Live Nozzle Status</div>
+      <div id="live-nozzle-status"></div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <button class="btn btn-primary" onclick="goToSale()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg>
+        Enter Sale / Close Shift
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Active Sale (Closing Meters + Payments) -->
+<div id="screen-sale" class="screen">
+  <div class="hdr">
+    <h1>Shift Sale Entry</h1>
+    <p id="sale-hdr-info"></p>
+  </div>
+  
+  <div class="section-hdr">Closing Meters</div>
+  <div id="closing-meters-section"></div>
+
+  <div class="section-hdr">Card Payments</div>
+  <div class="card">
+    <div class="card-title">Card Payment Entries</div>
+    <div id="card-payment-list"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <div class="field" style="margin:0">
+        <label>Amount (₹)</label>
+        <input type="number" id="card-amount" placeholder="0.00"/>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Litres</label>
+        <input type="number" id="card-litres" placeholder="0.00"/>
+      </div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="addCardPayment()">+ Add Card Entry</button>
+    <div style="margin-top:10px;font-weight:700;color:var(--blue)">Total Card: ₹<span id="card-total">0.00</span> | <span id="card-ltr-total">0.00</span> L</div>
+  </div>
+
+  <div class="section-hdr">QR Payments</div>
+  <div class="card">
+    <div class="card-title">QR / UPI Payment Entries</div>
+    <div id="qr-payment-list"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <div class="field" style="margin:0">
+        <label>Amount (₹)</label>
+        <input type="number" id="qr-amount" placeholder="0.00"/>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Litres</label>
+        <input type="number" id="qr-litres" placeholder="0.00"/>
+      </div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="addQRPayment()">+ Add QR Entry</button>
+    <div style="margin-top:10px;font-weight:700;color:var(--blue)">Total QR: ₹<span id="qr-total">0.00</span> | <span id="qr-ltr-total">0.00</span> L</div>
+  </div>
+
+  <div class="section-hdr">Cash Deposits to Cashier</div>
+  <div class="card">
+    <div class="card-title">Cash Deposit Log</div>
+    <div id="cash-deposit-log"></div>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="openCashCalc()">+ New Cash Deposit</button>
+    <div style="margin-top:10px;font-weight:700;color:var(--green)">Total Deposited: ₹<span id="total-deposited-display">0.00</span></div>
+  </div>
+
+  <div class="section-hdr">Close Shift & Reconcile</div>
+  <div class="card">
+    <button class="btn btn-red" onclick="closeShift()">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+      Close Shift & Reconcile
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN: Reconciliation Result -->
+<div id="screen-recon" class="screen">
+  <div class="hdr">
+    <h1>Shift Reconciliation</h1>
+    <p id="recon-hdr-info"></p>
+  </div>
+  <div id="recon-content"></div>
+  <div class="card" style="margin-top:0">
+    <button class="btn btn-primary" onclick="showScreen('home')">Back to Home</button>
+  </div>
+</div>
+
+<!-- SCREEN: Shift Log -->
+<div id="screen-log" class="screen">
+  <div class="hdr">
+    <h1>Shift Log</h1>
+    <p>Past shift records</p>
+  </div>
+  <div id="log-content"></div>
+</div>
+
+<!-- SCREEN: Settings -->
+<div id="screen-settings" class="screen">
+  <div class="hdr">
+    <h1>Settings</h1>
+    <p>Configure pump, rates & staff</p>
+  </div>
+
+  <div class="section-hdr">Fuel Rates</div>
+  <div class="card">
+    <div class="alert alert-blue" style="margin-bottom:12px">Rates apply to all future sales until updated.</div>
+    <div class="field">
+      <label>Petrol Rate (₹/L)</label>
+      <input type="number" id="rate-petrol" placeholder="e.g. 104.50" step="0.01"/>
+    </div>
+    <div class="field">
+      <label>Diesel Rate (₹/L)</label>
+      <input type="number" id="rate-diesel" placeholder="e.g. 91.00" step="0.01"/>
+    </div>
+    <div class="field">
+      <label>CNG Rate (₹/kg)</label>
+      <input type="number" id="rate-cng" placeholder="e.g. 76.00" step="0.01"/>
+    </div>
+    <div id="rate-history" style="margin-top:4px;font-size:12px;color:var(--gray-500)"></div>
+    <button class="btn btn-primary" style="margin-top:12px" onclick="saveRates()">Save Rates</button>
+  </div>
+
+  <div class="section-hdr">Staff</div>
+  <div class="card">
+    <div class="field">
+      <label>Cashier Name</label>
+      <input type="text" id="cashier-name" placeholder="Name of cashier on duty"/>
+    </div>
+    <div class="card-title" style="margin-top:8px">DSM List</div>
+    <div id="dsm-list"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input type="text" id="new-dsm" placeholder="Add DSM name" style="flex:1"/>
+      <button class="btn btn-primary btn-sm" onclick="addDSM()">Add</button>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:10px" onclick="saveStaff()">Save Staff Settings</button>
+  </div>
+
+  <div class="section-hdr">MPD Configuration</div>
+  <div class="card">
+    <div id="mpd-config-list"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:flex-end">
+      <div class="field" style="flex:1;margin:0">
+        <label>MPD Name</label>
+        <input type="text" id="new-mpd-name" placeholder="e.g. MPD-1"/>
+      </div>
+      <div class="field" style="flex:1;margin:0">
+        <label>Fuel Type</label>
+        <select id="new-mpd-fuel">
+          <option>Petrol</option>
+          <option>Diesel</option>
+          <option>CNG</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:0" onclick="addMPD()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Cash Calculator -->
+<div id="modal-cash" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);align-items:flex-end">
+  <div style="background:#fff;border-radius:var(--radius) var(--radius) 0 0;padding:20px;max-height:90vh;overflow-y:auto;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:17px;font-weight:600">Cash Deposit Calculator</h2>
+      <button onclick="closeCashCalc()" style="background:none;border:none;font-size:22px;color:var(--gray-500);cursor:pointer">×</button>
+    </div>
+    <div id="denom-rows"></div>
+    <div style="background:var(--green-light);padding:14px;border-radius:var(--radius);margin:12px 0;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:14px;font-weight:500;color:var(--green)">Total Cash</span>
+      <span style="font-size:22px;font-weight:700;color:var(--green)">₹<span id="calc-total">0.00</span></span>
+    </div>
+    <div class="field">
+      <label>Deposit Note (optional)</label>
+      <input type="text" id="deposit-note" placeholder="e.g. Morning deposit, 10:30 AM"/>
+    </div>
+    <button class="btn btn-green" onclick="confirmCashDeposit()">Confirm Deposit</button>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bnav">
+  <button onclick="showScreen('home')" id="nav-home" class="active">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+    <span>Home</span>
+  </button>
+  <button onclick="goToSale()" id="nav-sale">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+    <span>Sale</span>
+  </button>
+  <button onclick="showScreen('log')" id="nav-log">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>
+    <span>Log</span>
+  </button>
+  <button onclick="showScreen('settings')" id="nav-settings">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<script>
+// ==================== STATE ====================
+const DENOMS = [
+  {val:500,label:'₹500',type:'note'},
+  {val:200,label:'₹200',type:'note'},
+  {val:100,label:'₹100',type:'note'},
+  {val:50,label:'₹50',type:'note'},
+  {val:20,label:'₹20',type:'note'},
+  {val:10,label:'₹10',type:'note'},
+  {val:5,label:'5 coins',type:'coin'},
+  {val:2,label:'2 coins',type:'coin'},
+  {val:1,label:'1 coins',type:'coin'},
+];
+
+function S(key,def){
+  try{const v=localStorage.getItem(key);return v!=null?JSON.parse(v):def}catch{return def}
+}
+function SS(key,val){localStorage.setItem(key,JSON.stringify(val))}
+
+function getSettings(){
+  return {
+    dsms: S('dsm_list',[]),
+    cashier: S('cashier_name','Cashier'),
+    rates: S('fuel_rates',{petrol:0,diesel:0,cng:0}),
+    rateHistory: S('rate_history',[]),
+    mpds: S('mpd_list',[
+      {id:'mpd1',name:'MPD-1',fuel:'Petrol'},
+      {id:'mpd2',name:'MPD-2',fuel:'Diesel'},
+    ])
+  };
+}
+
+function getActiveShift(){return S('active_shift',null)}
+function setActiveShift(s){SS('active_shift',s)}
+function getShiftLog(){return S('shift_log',[])}
+
+// ==================== NAVIGATION ====================
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('active'));
+  const nb=document.getElementById('nav-'+name);
+  if(nb)nb.classList.add('active');
+  if(name==='home')renderHome();
+  if(name==='log')renderLog();
+  if(name==='settings')renderSettings();
+  if(name==='sale')renderSale();
+}
+
+function goToSale(){
+  if(!getActiveShift()){
+    alert('No active shift. Please start a shift first.');
+    return;
+  }
+  showScreen('sale');
+}
+
+// ==================== HOME ====================
+function renderHome(){
+  const today=new Date();
+  document.getElementById('hdr-date').textContent=today.toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('shift-date').value=today.toISOString().split('T')[0];
+  
+  const cfg=getSettings();
+  const shift=getActiveShift();
+  
+  // Rates display
+  const r=cfg.rates;
+  document.getElementById('current-rates-display').innerHTML=`
+    <div class="tiles">
+      <div class="tile"><div class="tile-val" style="color:var(--amber)">₹${r.petrol||'—'}</div><div class="tile-label">Petrol /L</div></div>
+      <div class="tile"><div class="tile-val" style="color:var(--blue)">₹${r.diesel||'—'}</div><div class="tile-label">Diesel /L</div></div>
+      <div class="tile"><div class="tile-val" style="color:var(--green)">₹${r.cng||'—'}</div><div class="tile-label">CNG /kg</div></div>
+      <div class="tile"><div class="tile-val" style="color:var(--gray-700)">${cfg.cashier||'—'}</div><div class="tile-label">Cashier</div></div>
+    </div>`;
+
+  if(shift){
+    document.getElementById('home-no-shift').style.display='none';
+    document.getElementById('home-active-shift').style.display='block';
+    document.getElementById('shift-active-info').textContent=
+      `${shift.dsmName} · ${shift.mpdName} · Started ${new Date(shift.startTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+    renderLiveNozzleStatus(shift);
+  } else {
+    document.getElementById('home-no-shift').style.display='block';
+    document.getElementById('home-active-shift').style.display='none';
+    renderDSMSelect();
+    renderMPDPills();
+  }
+}
+
+function renderDSMSelect(){
+  const cfg=getSettings();
+  const sel=document.getElementById('sel-dsm');
+  sel.innerHTML='<option value="">-- Select DSM --</option>'+
+    cfg.dsms.map(d=>`<option value="${d}">${d}</option>`).join('');
+}
+
+function renderMPDPills(){
+  const cfg=getSettings();
+  const container=document.getElementById('mpd-pills');
+  container.innerHTML=cfg.mpds.map(m=>
+    `<div class="mpd-pill" data-id="${m.id}" onclick="selectMPD('${m.id}')">${m.name}<br><small style="font-size:10px;opacity:.7">${m.fuel}</small></div>`
+  ).join('');
+  document.getElementById('nozzle-select-grid').innerHTML='';
+  document.getElementById('opening-meters-section').style.display='none';
+}
+
+let selectedMPD=null;
+let selectedNozzles=[];
+
+function selectMPD(id){
+  selectedMPD=id;
+  selectedNozzles=[];
+  document.querySelectorAll('.mpd-pill').forEach(p=>{
+    p.classList.toggle('active',p.dataset.id===id);
+  });
+  const cfg=getSettings();
+  const mpd=cfg.mpds.find(m=>m.id===id);
+  const grid=document.getElementById('nozzle-select-grid');
+  grid.innerHTML=['N1','N2','N3','N4'].map(n=>
+    `<div class="nozzle-card" data-nozzle="${n}" onclick="toggleNozzle('${n}',this)">
+      <h3>${n}</h3>
+      <p>${mpd?mpd.fuel:''}</p>
+    </div>`
+  ).join('');
+  document.getElementById('opening-meters-section').style.display='none';
+}
+
+function toggleNozzle(n,el){
+  const i=selectedNozzles.indexOf(n);
+  if(i>=0){selectedNozzles.splice(i,1);el.classList.remove('selected')}
+  else{selectedNozzles.push(n);el.classList.add('selected')}
+  renderOpeningMeterInputs();
+}
+
+function renderOpeningMeterInputs(){
+  const sec=document.getElementById('opening-meters-section');
+  const inp=document.getElementById('opening-meters-inputs');
+  if(selectedNozzles.length===0){sec.style.display='none';return}
+  sec.style.display='block';
+  inp.innerHTML=selectedNozzles.map(n=>
+    `<div class="meter-row">
+      <div class="meter-label">${n} Open</div>
+      <div class="meter-input"><input type="number" id="open-${n}" placeholder="Opening reading" step="0.01"/></div>
+    </div>`
+  ).join('');
+}
+
+document.getElementById('btn-start-shift').addEventListener('click',()=>{
+  const dsmEl=document.getElementById('sel-dsm');
+  const dsm=dsmEl.value;
+  if(!dsm){alert('Please select a DSM');return}
+  if(!selectedMPD){alert('Please select an MPD');return}
+  if(selectedNozzles.length===0){alert('Select at least one nozzle');return}
+  
+  const cfg=getSettings();
+  const mpd=cfg.mpds.find(m=>m.id===selectedMPD);
+  
+  const nozzles={};
+  let ok=true;
+  selectedNozzles.forEach(n=>{
+    const v=parseFloat(document.getElementById('open-'+n).value);
+    if(isNaN(v)){alert(`Enter opening meter for ${n}`);ok=false;return}
+    nozzles[n]={opening:v,closing:null,openTs:new Date().toISOString(),closeTs:null};
+  });
+  if(!ok)return;
+  
+  const shift={
+    id:'shift_'+Date.now(),
+    dsmName:dsm,
+    cashier:cfg.cashier,
+    mpdId:selectedMPD,
+    mpdName:mpd?mpd.name:'MPD',
+    mpdFuel:mpd?mpd.fuel:'Petrol',
+    date:document.getElementById('shift-date').value,
+    startTime:new Date().toISOString(),
+    endTime:null,
+    nozzles,
+    rates:cfg.rates,
+    cardPayments:[],
+    qrPayments:[],
+    cashDeposits:[],
+    closed:false
+  };
+  setActiveShift(shift);
+  selectedMPD=null; selectedNozzles=[];
+  renderHome();
+});
+
+function renderLiveNozzleStatus(shift){
+  const container=document.getElementById('live-nozzle-status');
+  container.innerHTML=Object.entries(shift.nozzles).map(([n,data])=>`
+    <div class="meter-row">
+      <div class="meter-label">${n}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;color:var(--gray-500)">Open: <strong>${data.opening.toFixed(2)}</strong></div>
+        ${data.closing!=null?`<div style="font-size:13px;color:var(--green)">Close: <strong>${data.closing.toFixed(2)}</strong></div>`:'<div class="ts">Not closed yet</div>'}
+      </div>
+      <span class="badge ${data.closing!=null?'badge-green':'badge-amber'}">${data.closing!=null?'Done':'Active'}</span>
+    </div>
+  `).join('');
+}
+
+// ==================== SALE SCREEN ====================
+function renderSale(){
+  const shift=getActiveShift();
+  if(!shift)return;
+  document.getElementById('sale-hdr-info').textContent=`${shift.dsmName} · ${shift.mpdName} · ${shift.date}`;
+  
+  // Closing meters
+  const sec=document.getElementById('closing-meters-section');
+  sec.innerHTML=`<div class="card"><div class="card-title">Enter Closing Meter Readings</div>`+
+    Object.entries(shift.nozzles).map(([n,data])=>`
+      <div class="meter-row">
+        <div class="meter-label">${n}</div>
+        <div style="flex:1">
+          <div class="ts">Open: ${data.opening.toFixed(2)}</div>
+          <div style="margin-top:4px;display:flex;gap:6px;align-items:center">
+            <input type="number" id="close-${n}" placeholder="Closing reading" step="0.01"
+              value="${data.closing!=null?data.closing:''}"
+              style="flex:1;font-size:15px"
+              onchange="saveClosingMeter('${n}',this.value)"/>
+            ${data.closing!=null?`<span class="badge badge-green" style="white-space:nowrap">${(data.closing-data.opening).toFixed(2)} L</span>`:''}
+          </div>
+          ${data.closing!=null?`<div class="ts" style="margin-top:2px">Closed: ${new Date(data.closeTs).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
+        </div>
+      </div>`
+    ).join('')+`</div>`;
+  
+  renderCardPayments(shift);
+  renderQRPayments(shift);
+  renderCashDeposits(shift);
+}
+
+function saveClosingMeter(nozzle,val){
+  const shift=getActiveShift();
+  if(!shift)return;
+  const v=parseFloat(val);
+  if(isNaN(v)||v<shift.nozzles[nozzle].opening){
+    alert('Closing meter must be ≥ opening meter');
+    document.getElementById('close-'+nozzle).value='';
+    return;
+  }
+  shift.nozzles[nozzle].closing=v;
+  shift.nozzles[nozzle].closeTs=new Date().toISOString();
+  setActiveShift(shift);
+  renderSale();
+  // Log the edit
+  addMeterEditLog(shift,nozzle,v);
+}
+
+function addMeterEditLog(shift,nozzle,val){
+  const log=S('meter_edit_log',[]);
+  log.push({shiftId:shift.id,nozzle,value:val,ts:new Date().toISOString()});
+  SS('meter_edit_log',log);
+}
+
+// Card payments
+function renderCardPayments(shift){
+  const list=document.getElementById('card-payment-list');
+  list.innerHTML=shift.cardPayments.map((p,i)=>`
+    <div class="deposit-item">
+      <div><div style="font-size:14px;font-weight:500">₹${p.amount.toFixed(2)}</div><div class="ts">${p.litres.toFixed(2)} L · ${new Date(p.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      <button class="btn btn-sm btn-secondary" onclick="removeCardPayment(${i})">✕</button>
+    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No card entries yet</p>';
+  const tot=shift.cardPayments.reduce((a,p)=>a+p.amount,0);
+  const ltr=shift.cardPayments.reduce((a,p)=>a+p.litres,0);
+  document.getElementById('card-total').textContent=tot.toFixed(2);
+  document.getElementById('card-ltr-total').textContent=ltr.toFixed(2);
+}
+
+function addCardPayment(){
+  const shift=getActiveShift();
+  const amt=parseFloat(document.getElementById('card-amount').value);
+  const ltr=parseFloat(document.getElementById('card-litres').value);
+  if(isNaN(amt)||amt<=0){alert('Enter valid card amount');return}
+  if(isNaN(ltr)||ltr<=0){alert('Enter valid litres');return}
+  shift.cardPayments.push({amount:amt,litres:ltr,ts:new Date().toISOString()});
+  setActiveShift(shift);
+  document.getElementById('card-amount').value='';
+  document.getElementById('card-litres').value='';
+  renderSale();
+}
+
+function removeCardPayment(i){
+  const shift=getActiveShift();
+  shift.cardPayments.splice(i,1);
+  setActiveShift(shift);
+  renderSale();
+}
+
+// QR payments
+function renderQRPayments(shift){
+  const list=document.getElementById('qr-payment-list');
+  list.innerHTML=shift.qrPayments.map((p,i)=>`
+    <div class="deposit-item">
+      <div><div style="font-size:14px;font-weight:500">₹${p.amount.toFixed(2)}</div><div class="ts">${p.litres.toFixed(2)} L · ${new Date(p.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      <button class="btn btn-sm btn-secondary" onclick="removeQRPayment(${i})">✕</button>
+    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No QR entries yet</p>';
+  const tot=shift.qrPayments.reduce((a,p)=>a+p.amount,0);
+  const ltr=shift.qrPayments.reduce((a,p)=>a+p.litres,0);
+  document.getElementById('qr-total').textContent=tot.toFixed(2);
+  document.getElementById('qr-ltr-total').textContent=ltr.toFixed(2);
+}
+
+function addQRPayment(){
+  const shift=getActiveShift();
+  const amt=parseFloat(document.getElementById('qr-amount').value);
+  const ltr=parseFloat(document.getElementById('qr-litres').value);
+  if(isNaN(amt)||amt<=0){alert('Enter valid QR amount');return}
+  if(isNaN(ltr)||ltr<=0){alert('Enter valid litres');return}
+  shift.qrPayments.push({amount:amt,litres:ltr,ts:new Date().toISOString()});
+  setActiveShift(shift);
+  document.getElementById('qr-amount').value='';
+  document.getElementById('qr-litres').value='';
+  renderSale();
+}
+
+function removeQRPayment(i){
+  const shift=getActiveShift();
+  shift.qrPayments.splice(i,1);
+  setActiveShift(shift);
+  renderSale();
+}
+
+// Cash deposits
+function renderCashDeposits(shift){
+  const list=document.getElementById('cash-deposit-log');
+  list.innerHTML=shift.cashDeposits.map((d,i)=>`
+    <div class="deposit-item">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--green)">₹${d.total.toFixed(2)}</div>
+        <div class="ts">${d.note||'Cash deposit'} · ${new Date(d.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${formatDenomSummary(d.denoms)}</div>
+      </div>
+      <button class="btn btn-sm btn-secondary" onclick="removeCashDeposit(${i})">✕</button>
+    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No deposits yet</p>';
+  const tot=shift.cashDeposits.reduce((a,d)=>a+d.total,0);
+  document.getElementById('total-deposited-display').textContent=tot.toFixed(2);
+}
+
+function formatDenomSummary(denoms){
+  return DENOMS.filter(d=>denoms[d.val]>0).map(d=>`${d.label}×${denoms[d.val]}`).join(', ');
+}
+
+function removeCashDeposit(i){
+  const shift=getActiveShift();
+  shift.cashDeposits.splice(i,1);
+  setActiveShift(shift);
+  renderSale();
+}
+
+// ==================== CASH CALCULATOR ====================
+function openCashCalc(){
+  const modal=document.getElementById('modal-cash');
+  modal.style.display='flex';
+  document.getElementById('deposit-note').value='';
+  const rows=document.getElementById('denom-rows');
+  rows.innerHTML=DENOMS.map(d=>`
+    <div class="denom-row">
+      <div class="denom-label">${d.label}</div>
+      <input type="number" min="0" step="1" value="0" id="den-${d.val}"
+        style="text-align:center"
+        oninput="recalcCash()"/>
+      <div class="denom-total" id="dent-${d.val}">₹0</div>
+    </div>`).join('');
+  recalcCash();
+}
+
+function recalcCash(){
+  let total=0;
+  DENOMS.forEach(d=>{
+    const n=parseInt(document.getElementById('den-'+d.val).value)||0;
+    const sub=n*d.val;
+    document.getElementById('dent-'+d.val).textContent='₹'+sub.toFixed(0);
+    total+=sub;
+  });
+  document.getElementById('calc-total').textContent=total.toFixed(2);
+}
+
+function closeCashCalc(){
+  document.getElementById('modal-cash').style.display='none';
+}
+
+function confirmCashDeposit(){
+  const shift=getActiveShift();
+  const denoms={};
+  let total=0;
+  DENOMS.forEach(d=>{
+    const n=parseInt(document.getElementById('den-'+d.val).value)||0;
+    denoms[d.val]=n;
+    total+=n*d.val;
+  });
+  if(total<=0){alert('Enter denomination amounts');return}
+  const note=document.getElementById('deposit-note').value;
+  shift.cashDeposits.push({denoms,total,note,ts:new Date().toISOString()});
+  setActiveShift(shift);
+  closeCashCalc();
+  renderSale();
+}
+
+// ==================== CLOSE SHIFT ====================
+function closeShift(){
+  const shift=getActiveShift();
+  if(!shift){alert('No active shift');return}
+  
+  // Check all nozzles have closing meters
+  const unclosed=Object.entries(shift.nozzles).filter(([n,d])=>d.closing==null);
+  if(unclosed.length>0){
+    if(!confirm(`Nozzles ${unclosed.map(([n])=>n).join(', ')} have no closing meter. Continue?`))return;
+  }
+  
+  // Calculate totals
+  const rates=shift.rates;
+  const fuel=shift.mpdFuel;
+  const ratePerL=fuel==='Petrol'?rates.petrol:fuel==='Diesel'?rates.diesel:rates.cng;
+  
+  let totalLitres=0;
+  Object.values(shift.nozzles).forEach(d=>{
+    if(d.closing!=null) totalLitres+=(d.closing-d.opening);
+  });
+  
+  const totalSaleAmt=totalLitres*ratePerL;
+  const totalCard=shift.cardPayments.reduce((a,p)=>a+p.amount,0);
+  const totalCardLtr=shift.cardPayments.reduce((a,p)=>a+p.litres,0);
+  const totalQR=shift.qrPayments.reduce((a,p)=>a+p.amount,0);
+  const totalQRLtr=shift.qrPayments.reduce((a,p)=>a+p.litres,0);
+  const cashSaleLtr=totalLitres-totalCardLtr-totalQRLtr;
+  const cashSaleAmt=cashSaleLtr*ratePerL;
+  const totalDeposited=shift.cashDeposits.reduce((a,d)=>a+d.total,0);
+  const diff=cashSaleAmt-totalDeposited;
+  
+  shift.closed=true;
+  shift.endTime=new Date().toISOString();
+  shift.summary={totalLitres,totalSaleAmt,totalCard,totalQR,totalCardLtr,totalQRLtr,cashSaleLtr,cashSaleAmt,totalDeposited,diff,ratePerL};
+  
+  // Save to log
+  const log=getShiftLog();
+  log.unshift(shift);
+  SS('shift_log',log);
+  setActiveShift(null);
+  
+  renderReconciliation(shift);
+  showScreen('recon');
+}
+
+function renderReconciliation(shift){
+  const s=shift.summary;
+  document.getElementById('recon-hdr-info').textContent=`${shift.dsmName} · ${shift.date}`;
+  const ok=Math.abs(s.diff)<0.01;
+  const short=s.diff<-0.01;
+  
+  document.getElementById('recon-content').innerHTML=`
+    <div class="card">
+      <div class="card-title">Sale Summary</div>
+      <div class="recon-row"><span class="recon-key">${shift.mpdFuel} Rate</span><span class="recon-val">₹${s.ratePerL.toFixed(2)}/L</span></div>
+      <div class="recon-row"><span class="recon-key">Total Litres Sold</span><span class="recon-val">${s.totalLitres.toFixed(3)} L</span></div>
+      <div class="recon-row"><span class="recon-key">Total Sale Amount</span><span class="recon-val">₹${s.totalSaleAmt.toFixed(2)}</span></div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Payment Breakdown</div>
+      <div class="recon-row"><span class="recon-key">Card Sales</span><span class="recon-val" style="color:var(--blue)">₹${s.totalCard.toFixed(2)} (${s.totalCardLtr.toFixed(2)} L)</span></div>
+      <div class="recon-row"><span class="recon-key">QR/UPI Sales</span><span class="recon-val" style="color:var(--blue)">₹${s.totalQR.toFixed(2)} (${s.totalQRLtr.toFixed(2)} L)</span></div>
+      <div class="recon-row"><span class="recon-key">Cash Sale Litres</span><span class="recon-val">${s.cashSaleLtr.toFixed(3)} L</span></div>
+      <div class="recon-row"><span class="recon-key">Cash Sale Amount</span><span class="recon-val" style="color:var(--amber)">₹${s.cashSaleAmt.toFixed(2)}</span></div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Cash Reconciliation</div>
+      <div class="recon-row"><span class="recon-key">Expected Cash</span><span class="recon-val">₹${s.cashSaleAmt.toFixed(2)}</span></div>
+      <div class="recon-row"><span class="recon-key">Deposited to ${shift.cashier}</span><span class="recon-val">₹${s.totalDeposited.toFixed(2)}</span></div>
+      <div class="match-box ${ok?'match-ok':short?'match-diff':'match-diff'}">
+        ${ok?'✓ Cash Matched!':short?`⚠ Short by ₹${Math.abs(s.diff).toFixed(2)}`:`⚠ Excess ₹${s.diff.toFixed(2)}`}
+      </div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Shift Details</div>
+      <div class="recon-row"><span class="recon-key">DSM</span><span class="recon-val">${shift.dsmName}</span></div>
+      <div class="recon-row"><span class="recon-key">MPD</span><span class="recon-val">${shift.mpdName}</span></div>
+      <div class="recon-row"><span class="recon-key">Start</span><span class="recon-val">${new Date(shift.startTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span></div>
+      <div class="recon-row"><span class="recon-key">End</span><span class="recon-val">${new Date(shift.endTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span></div>
+    </div>`;
+}
+
+// ==================== SHIFT LOG ====================
+function renderLog(){
+  const log=getShiftLog();
+  const container=document.getElementById('log-content');
+  if(log.length===0){
+    container.innerHTML='<div class="card"><p style="color:var(--gray-400);text-align:center;padding:20px">No completed shifts yet</p></div>';
+    return;
+  }
+  container.innerHTML=log.map((s,i)=>{
+    const sm=s.summary||{};
+    return `<div class="card" style="cursor:pointer" onclick="expandLog(${i})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:600;font-size:15px">${s.dsmName}</div>
+          <div class="ts">${s.date} · ${s.mpdName}</div>
+        </div>
+        <span class="badge ${sm.diff!=null&&Math.abs(sm.diff)<0.01?'badge-green':'badge-amber'}">${sm.diff!=null&&Math.abs(sm.diff)<0.01?'Matched':'Review'}</span>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:12px;font-size:13px">
+        <span><strong>${sm.totalLitres!=null?sm.totalLitres.toFixed(1):'—'}</strong> L</span>
+        <span>₹<strong>${sm.totalSaleAmt!=null?sm.totalSaleAmt.toFixed(0):'—'}</strong> sale</span>
+        <span style="color:var(--green)">₹<strong>${sm.totalDeposited!=null?sm.totalDeposited.toFixed(0):'—'}</strong> cash</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function expandLog(i){
+  const log=getShiftLog();
+  const shift=log[i];
+  if(!shift.summary)return;
+  renderReconciliation(shift);
+  document.getElementById('recon-hdr-info').textContent=`${shift.dsmName} · ${shift.date} (Past)`;
+  showScreen('recon');
+}
+
+// ==================== SETTINGS ====================
+function renderSettings(){
+  const cfg=getSettings();
+  document.getElementById('rate-petrol').value=cfg.rates.petrol||'';
+  document.getElementById('rate-diesel').value=cfg.rates.diesel||'';
+  document.getElementById('rate-cng').value=cfg.rates.cng||'';
+  document.getElementById('cashier-name').value=cfg.cashier||'';
+  
+  // Rate history
+  const hist=cfg.rateHistory.slice(-3).reverse();
+  document.getElementById('rate-history').innerHTML=hist.length?
+    'Recent: '+hist.map(h=>`${new Date(h.ts).toLocaleDateString('en-IN')} — P:₹${h.petrol} D:₹${h.diesel} CNG:₹${h.cng}`).join(' | '):'';
+  
+  // DSM list
+  renderDSMList(cfg);
+  // MPD config
+  renderMPDConfig(cfg);
+}
+
+function renderDSMList(cfg){
+  const list=document.getElementById('dsm-list');
+  list.innerHTML=cfg.dsms.length?cfg.dsms.map((d,i)=>`
+    <div class="deposit-item">
+      <span style="font-size:14px">${d}</span>
+      <button class="btn btn-sm btn-secondary" onclick="removeDSM(${i})">✕</button>
+    </div>`).join(''):'<p style="color:var(--gray-400);font-size:13px">No DSMs added yet</p>';
+}
+
+function addDSM(){
+  const input=document.getElementById('new-dsm');
+  const name=input.value.trim();
+  if(!name)return;
+  const cfg=getSettings();
+  if(cfg.dsms.includes(name)){alert('DSM already exists');return}
+  cfg.dsms.push(name);
+  SS('dsm_list',cfg.dsms);
+  input.value='';
+  renderDSMList(cfg);
+}
+
+function removeDSM(i){
+  const cfg=getSettings();
+  cfg.dsms.splice(i,1);
+  SS('dsm_list',cfg.dsms);
+  renderSettings();
+}
+
+function saveStaff(){
+  const cashier=document.getElementById('cashier-name').value.trim();
+  SS('cashier_name',cashier||'Cashier');
+  alert('Staff settings saved');
+}
+
+function saveRates(){
+  const p=parseFloat(document.getElementById('rate-petrol').value);
+  const d=parseFloat(document.getElementById('rate-diesel').value);
+  const c=parseFloat(document.getElementById('rate-cng').value);
+  if([p,d,c].some(isNaN)||[p,d,c].some(v=>v<=0)){alert('Enter valid rates for all fuels');return}
+  const rates={petrol:p,diesel:d,cng:c};
+  SS('fuel_rates',rates);
+  const hist=S('rate_history',[]);
+  hist.push({...rates,ts:new Date().toISOString()});
+  SS('rate_history',hist);
+  renderSettings();
+  alert('Rates saved successfully');
+}
+
+function renderMPDConfig(cfg){
+  const list=document.getElementById('mpd-config-list');
+  list.innerHTML=cfg.mpds.length?cfg.mpds.map((m,i)=>`
+    <div class="deposit-item">
+      <div>
+        <div style="font-size:14px;font-weight:500">${m.name}</div>
+        <div class="ts">${m.fuel} · 4 nozzles (N1–N4)</div>
+      </div>
+      <button class="btn btn-sm btn-secondary" onclick="removeMPD(${i})">✕</button>
+    </div>`).join(''):'<p style="color:var(--gray-400);font-size:13px">No MPDs configured</p>';
+}
+
+function addMPD(){
+  const name=document.getElementById('new-mpd-name').value.trim();
+  const fuel=document.getElementById('new-mpd-fuel').value;
+  if(!name){alert('Enter MPD name');return}
+  const cfg=getSettings();
+  cfg.mpds.push({id:'mpd'+Date.now(),name,fuel});
+  SS('mpd_list',cfg.mpds);
+  document.getElementById('new-mpd-name').value='';
+  renderMPDConfig(cfg);
+}
+
+function removeMPD(i){
+  const cfg=getSettings();
+  cfg.mpds.splice(i,1);
+  SS('mpd_list',cfg.mpds);
+  renderSettings();
+}
+
+// ==================== INIT ====================
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+renderHome();
+</script>
+</body>
+</html>
