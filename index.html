@@ -1,1018 +1,1442 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<meta name="theme-color" content="#1a56db"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="apple-mobile-web-app-title" content="DSM Shift"/>
-<link rel="manifest" href="manifest.json"/>
-<title>DSM Shift Manager</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>⛽ FuelDesk — DSM</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Roboto:wght@400;500;700;900&family=Exo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyBJhl-6tDX3SvTpQJKbUm7yOfTDoDOdmJk",
+  authDomain:        "fueldesk-536b6.firebaseapp.com",
+  projectId:         "fueldesk-536b6",
+  storageBucket:     "fueldesk-536b6.firebasestorage.app",
+  messagingSenderId: "65760883049",
+  appId:             "1:65760883049:web:23163e769156301583cdf8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+window._saveToCloud = async function(record) {
+  try {
+    await db.collection("dsm_records").add({
+      ...record,
+      savedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch(e) {
+    console.error("Firebase error:", e);
+    return false;
+  }
+};
+</script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  --blue:#1a56db;--blue-light:#eff4ff;--blue-dark:#1341b3;
-  --green:#057a55;--green-light:#ecfdf5;
-  --red:#e02424;--red-light:#fdf2f2;
-  --amber:#d97706;--amber-light:#fffbeb;
-  --gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
-  --gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;
-  --gray-700:#374151;--gray-900:#111827;
-  --radius:10px;--radius-sm:6px;
-  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
-  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1);
+  --bg:#F1F4F8; --bg2:#E8EBF0; --card:#FFFFFF;
+  --border:#D1D7E2; --border2:#BAC2D0;
+  --ms:#15803D; --ms-bg:#F0FDF4; --ms-bd:#86EFAC; --ms-lt:#DCFCE7;
+  --hsd:#1D6FB8; --hsd-bg:#EFF6FF; --hsd-bd:#93C5FD; --hsd-lt:#DBEAFE;
+  --cng:#D97706; --cng-bg:#FFFBEB; --cng-bd:#FCD34D; --cng-lt:#FEF3C7;
+  --app:#1E6B8E; --app2:#155E75;
+  --text:#1E293B; --muted:#64748B;
+  --red:#DC2626; --purple:#7C3AED;
+  --cash:#92400E; --cash-bg:#FFFBEB; --cash-bd:#FCD34D;
+  --r:12px;
+  --num:'Roboto',sans-serif;
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:var(--gray-900);background:var(--gray-50);min-height:100vh}
-.screen{display:none;min-height:100vh;padding-bottom:80px}
-.screen.active{display:block}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column}
 
-/* Header */
-.hdr{background:var(--blue);color:#fff;padding:14px 16px 10px;position:sticky;top:0;z-index:50}
-.hdr h1{font-size:17px;font-weight:600;letter-spacing:.01em}
-.hdr p{font-size:12px;opacity:.8;margin-top:2px}
+.hdr{background:linear-gradient(120deg,#1a3a5c,#1E6B8E);padding:11px 16px;
+     display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.hdr-icon{font-size:26px}
+.hdr-text{flex:1}
+.hdr-title{font-family:'Orbitron',monospace;font-size:17px;font-weight:900;color:#fff;letter-spacing:1.5px;line-height:1}
+.hdr-sub{font-size:9px;color:rgba(255,255,255,.6);letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+.rate-pills{display:flex;gap:3px;flex-direction:column;align-items:flex-end}
+.rpill{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:var(--num);border:1px solid;white-space:nowrap}
+.rpill.ms {color:#14532D;border-color:#86EFAC;background:#DCFCE7}
+.rpill.hsd{color:#1E3A8A;border-color:#93C5FD;background:#DBEAFE}
+.rpill.cng{color:#78350F;border-color:#FCD34D;background:#FEF3C7}
 
-/* Bottom Nav */
-.bnav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--gray-200);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
-.bnav button{flex:1;border:none;background:none;padding:10px 4px 8px;cursor:pointer;color:var(--gray-400);font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.15s}
-.bnav button svg{width:22px;height:22px;stroke-width:1.7}
-.bnav button.active{color:var(--blue)}
-.bnav button span{font-weight:500}
+.tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:11px 11px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+     color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all .2s;white-space:nowrap;position:relative}
+.tab.active{color:var(--app);border-bottom-color:var(--app);background:#F0F9FF}
+.tab .badge{position:absolute;top:7px;right:5px;width:7px;height:7px;border-radius:50%;background:#15803D;border:1.5px solid #fff;display:none}
+.tab .badge.show{display:block}
 
-/* Cards */
-.card{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:16px;margin:12px 12px 0;box-shadow:var(--shadow)}
-.card-title{font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 100px}
+.pg{display:none;animation:fu .2s ease}.pg.active{display:block}
+@keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
-/* Form elements */
-label{display:block;font-size:13px;font-weight:500;color:var(--gray-700);margin-bottom:4px}
-input[type=text],input[type=number],select{width:100%;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);padding:10px 12px;font-size:15px;background:#fff;transition:.15s;outline:none;-webkit-appearance:none}
-input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.12)}
-.field{margin-bottom:14px}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ch{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);
+    font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;flex-wrap:wrap}
+.ch.app   {background:#EFF8FF;color:var(--app);border-color:#BFDBFE}
+.ch.ms    {background:#F0FDF4;color:#166534;border-color:var(--ms-bd)}
+.ch.hsd   {background:#EFF6FF;color:#1E3A8A;border-color:var(--hsd-bd)}
+.ch.cng   {background:#FFFBEB;color:#78350F;border-color:var(--cng-bd)}
+.ch.red   {background:#FFF5F5;color:#B91C1C;border-color:#FECACA}
+.ch.purple{background:#FAF5FF;color:#6D28D9;border-color:#DDD6FE}
+.ch.cash  {background:var(--cash-bg);color:var(--cash);border-color:var(--cash-bd)}
+.ch.grn   {background:#F0FDF4;color:#166534;border-color:var(--ms-bd)}
+.cb{padding:14px}
 
-/* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:var(--radius-sm);padding:11px 18px;font-size:15px;font-weight:500;cursor:pointer;transition:.15s;width:100%}
-.btn-primary{background:var(--blue);color:#fff}
-.btn-primary:active{background:var(--blue-dark)}
-.btn-secondary{background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-300)}
-.btn-green{background:var(--green);color:#fff}
-.btn-red{background:var(--red);color:#fff}
-.btn-sm{padding:7px 12px;font-size:13px;width:auto}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.field label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.field input,.field select{
+  background:#F8FAFC;border:1.5px solid var(--border2);color:var(--text);
+  font-family:var(--num);font-size:17px;font-weight:700;
+  padding:11px 13px;border-radius:9px;outline:none;width:100%;
+  transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none}
+.field select{font-family:'Exo 2',sans-serif}
+.field input:focus,.field select:focus{border-color:var(--app);box-shadow:0 0 0 3px rgba(30,107,142,.1);background:#fff}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 
-/* Tags/Badges */
-.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:12px;font-weight:500}
-.badge-blue{background:var(--blue-light);color:var(--blue)}
-.badge-green{background:var(--green-light);color:var(--green)}
-.badge-amber{background:var(--amber-light);color:var(--amber)}
-.badge-red{background:var(--red-light);color:var(--red)}
+.rate-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rbox{border:2px solid;border-radius:10px;padding:12px 8px;text-align:center}
+.rbox.ms{background:var(--ms-bg);border-color:var(--ms-bd)}
+.rbox.hsd{background:var(--hsd-bg);border-color:var(--hsd-bd)}
+.rbox.cng{background:var(--cng-bg);border-color:var(--cng-bd)}
+.rbox label{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;display:block;margin-bottom:6px}
+.rbox.ms  label{color:#166534}.rbox.hsd label{color:#1E3A8A}.rbox.cng label{color:#78350F}
+.rbox input{background:transparent;border:none;border-bottom:2px solid var(--border2);
+            font-family:var(--num);font-size:16px;font-weight:700;padding:4px 0;width:100%;text-align:center;outline:none;transition:border-color .2s}
+.rbox.ms  input{color:#166534}.rbox.ms  input:focus{border-color:var(--ms)}
+.rbox.hsd input{color:#1E3A8A}.rbox.hsd input:focus{border-color:var(--hsd)}
+.rbox.cng input{color:#78350F}.rbox.cng input:focus{border-color:var(--cng)}
+.rsaved{font-size:9px;color:var(--muted);margin-top:4px;font-family:var(--num)}
 
-/* Nozzle grid */
-.nozzle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.nozzle-card{border:2px solid var(--gray-200);border-radius:var(--radius);padding:12px;cursor:pointer;transition:.15s;background:#fff;text-align:center}
-.nozzle-card.selected{border-color:var(--blue);background:var(--blue-light)}
-.nozzle-card h3{font-size:16px;font-weight:700;color:var(--blue)}
-.nozzle-card p{font-size:12px;color:var(--gray-500);margin-top:2px}
+.mpd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mpd-card{background:#F8FAFC;border:2px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:all .2s;position:relative}
+.mpd-card.sel{border-color:var(--app);background:#EFF8FF;box-shadow:0 2px 10px rgba(30,107,142,.15)}
+.mpd-ttl{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;color:#334155;letter-spacing:1px;margin-bottom:8px}
+.mpd-card.sel .mpd-ttl{color:var(--app)}
+.mpd-nrow{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.mnchip{padding:3px 7px;border-radius:5px;font-size:9px;font-weight:800;letter-spacing:.8px;font-family:'Orbitron',monospace;border:1px solid}
+.mnchip.ms{background:var(--ms-lt);color:#166534;border-color:var(--ms-bd)}
+.mnchip.hsd{background:var(--hsd-lt);color:#1E3A8A;border-color:var(--hsd-bd)}
+.mnchip.cng{background:var(--cng-lt);color:#78350F;border-color:var(--cng-bd)}
+.mpd-desc{font-size:10px;color:var(--muted);line-height:1.4}
+.mpd-chk{position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:var(--app);display:none;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.mpd-card.sel .mpd-chk{display:flex}
 
-/* Meter row */
-.meter-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--gray-100)}
-.meter-row:last-child{border:none}
-.meter-label{flex:0 0 80px;font-size:13px;font-weight:600;color:var(--gray-700)}
-.meter-input{flex:1}
-.meter-input input{font-size:16px;font-weight:500;text-align:right}
+.nsel-grid{display:flex;gap:8px;flex-wrap:wrap}
+.nsel-chip{padding:9px 14px;border-radius:9px;border:2px solid var(--border);background:#F8FAFC;
+           font-family:'Orbitron',monospace;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+           display:flex;flex-direction:column;align-items:center;gap:2px;min-width:62px;text-align:center;color:var(--muted)}
+.nsel-chip .nf{font-size:8px;letter-spacing:1px;font-weight:800}
+.nsel-chip.ms-c.sel{border-color:var(--ms);background:var(--ms-bg);color:#166534}
+.nsel-chip.hsd-c.sel{border-color:var(--hsd);background:var(--hsd-bg);color:#1E3A8A}
+.nsel-chip.cng-c.sel{border-color:var(--cng);background:var(--cng-bg);color:#78350F}
 
-/* Denomination calculator */
-.denom-row{display:grid;grid-template-columns:80px 1fr 90px;gap:8px;align-items:center;padding:6px 0}
-.denom-label{font-size:14px;font-weight:600;color:var(--gray-700)}
-.denom-total{font-size:14px;font-weight:600;text-align:right;color:var(--green)}
+.nm-badge{font-size:9px;font-weight:800;letter-spacing:1.5px;padding:2px 8px;border-radius:4px;text-transform:uppercase;border:1px solid}
+.nm-badge.ms{background:var(--ms-lt);color:#166534;border-color:var(--ms-bd)}
+.nm-badge.hsd{background:var(--hsd-lt);color:#1E3A8A;border-color:var(--hsd-bd)}
+.nm-badge.cng{background:var(--cng-lt);color:#78350F;border-color:var(--cng-bd)}
+.nm-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nmf label{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:1.5px;text-transform:uppercase;display:block;margin-bottom:3px}
+.nmf input{background:rgba(255,255,255,.85);border:1.5px solid var(--border2);border-radius:7px;color:var(--text);
+           font-family:var(--num);font-size:19px;font-weight:700;padding:8px 10px;width:100%;outline:none;transition:border-color .2s}
+.nmf input:focus{border-color:var(--app)}
+.nm-results{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2)}
+.nm-res{border-radius:8px;padding:10px;text-align:center;border:1px solid;background:#fff}
+.nm-res.ms{border-color:var(--ms-bd)}.nm-res.hsd{border-color:var(--hsd-bd)}.nm-res.cng{border-color:var(--cng-bd)}
+.nm-res .rv{font-family:var(--num);font-size:14px;font-weight:700}
+.nm-res .rl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.add-reading-btn{width:100%;margin-top:10px;padding:10px;background:#F0F9FF;border:1.5px dashed #93C5FD;
+                 color:#1E3A8A;border-radius:9px;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.nozzle-day-total{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding-top:12px;border-top:2px dashed var(--border2)}
 
-/* Summary tiles */
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tile{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:14px;text-align:center}
-.tile-val{font-size:22px;font-weight:700;color:var(--gray-900);margin-bottom:2px}
-.tile-label{font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em}
+.qr-row{background:#FAF5FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px;margin-bottom:8px}
+.qr-lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#6D28D9;text-transform:uppercase;margin-bottom:8px}
+.cr-row{background:#FFF5F5;border:1px solid #FECACA;border-radius:10px;padding:12px;margin-bottom:8px}
+.cr-lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#B91C1C;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
 
-/* Cash deposit log */
-.deposit-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100)}
-.deposit-item:last-child{border:none}
+/* CASH DENOMINATION */
+.denom-wrap{border:1px solid var(--cash-bd);border-radius:10px;overflow:hidden}
+.denom-hdr{display:grid;grid-template-columns:90px 1fr 1fr;background:var(--cash-bg);padding:8px 12px;border-bottom:2px solid var(--cash-bd)}
+.denom-hdr span{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--cash)}
+.denom-hdr span:nth-child(2){text-align:center}.denom-hdr span:nth-child(3){text-align:right}
+.denom-row{display:grid;grid-template-columns:90px 1fr 1fr;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);background:#fff}
+.denom-row:nth-child(even){background:#FAFBFC}.denom-row:last-child{border-bottom:none}
+.denom-note{font-family:var(--num);font-size:14px;font-weight:700;color:var(--cash)}
+.denom-cnt-cell{display:flex;justify-content:center}
+.denom-cnt{width:72px;text-align:center;background:#fff;border:1.5px solid var(--cash-bd);border-radius:7px;
+           color:var(--text);font-family:var(--num);font-size:17px;font-weight:700;padding:6px 4px;outline:none;-webkit-appearance:none}
+.denom-cnt:focus{border-color:var(--cng);box-shadow:0 0 0 3px rgba(217,119,6,.1)}
+.denom-rtot{text-align:right;font-family:var(--num);font-size:13px;font-weight:700;color:var(--cash)}
+.denom-total-row{display:grid;grid-template-columns:90px 1fr 1fr;align-items:center;padding:11px 12px;background:var(--cash-bg);border-top:2px solid var(--cash-bd)}
+.denom-total-row .dtl{font-family:'Exo 2',sans-serif;font-size:10px;font-weight:800;color:var(--cash);letter-spacing:1px;text-transform:uppercase;grid-column:1/3}
+.denom-total-row .dtv{text-align:right;font-family:var(--num);font-size:20px;font-weight:900;color:var(--cash)}
+.coins-row{background:#FFFBEB;border:1px solid var(--cng-bd);border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.coins-row label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#78350F}
+.coins-input{width:120px;text-align:right;background:#fff;border:1.5px solid var(--cng-bd);border-radius:7px;color:var(--text);font-family:var(--num);font-size:17px;font-weight:700;padding:8px 10px;outline:none}
 
-/* Reconcile */
-.recon-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100)}
-.recon-row:last-child{border:none}
-.recon-key{font-size:14px;color:var(--gray-700)}
-.recon-val{font-size:15px;font-weight:600}
-.match-box{padding:16px;border-radius:var(--radius);text-align:center;font-size:17px;font-weight:700;margin-top:8px}
-.match-ok{background:var(--green-light);color:var(--green)}
-.match-diff{background:var(--red-light);color:var(--red)}
+/* CASH DEPOSIT LOG */
+.cash-dep-item{border:1px solid var(--cash-bd);border-radius:9px;padding:11px 13px;margin-bottom:8px;background:#FFFBEB;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cash-dep-amount{font-family:var(--num);font-size:20px;font-weight:900;color:var(--cash)}
+.cash-dep-ts{font-size:10px;color:var(--muted);font-family:var(--num);margin-top:3px}
+.cash-dep-denoms{font-size:10px;color:#92400E;margin-top:5px;line-height:1.5}
+.cash-dep-del{background:#FFF5F5;border:1px solid #FECACA;color:#DC2626;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.cash-saved-total{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--cash-bg);border:2px solid var(--cash-bd);border-radius:10px;margin-top:4px}
+.cash-saved-total .cst-l{font-size:11px;font-weight:800;color:var(--cash);text-transform:uppercase;letter-spacing:1px}
+.cash-saved-total .cst-v{font-family:var(--num);font-size:22px;font-weight:900;color:var(--cash)}
 
-/* Log table */
-.log-table{width:100%;border-collapse:collapse;font-size:13px}
-.log-table th{background:var(--gray-50);padding:8px 10px;text-align:left;font-weight:600;color:var(--gray-500);border-bottom:1px solid var(--gray-200)}
-.log-table td{padding:8px 10px;border-bottom:1px solid var(--gray-100)}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.rrow:last-child{border-bottom:none}
+.rrow .rl{font-size:13px;color:var(--muted);font-weight:600}
+.rrow .rv{font-family:var(--num);font-size:14px;font-weight:700;color:var(--text)}
+hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
 
-/* Alert */
-.alert{padding:12px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:12px}
-.alert-blue{background:var(--blue-light);color:var(--blue-dark);border:1px solid #c3d3f7}
-.alert-green{background:var(--green-light);color:var(--green)}
-.alert-red{background:var(--red-light);color:var(--red)}
+.big-diff{border-radius:14px;padding:20px 16px;text-align:center;margin-bottom:12px;border:2px solid}
+.bd-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:800;margin-bottom:8px;font-family:'Exo 2',sans-serif}
+.bd-val{font-family:var(--num);font-size:48px;font-weight:900;line-height:1}
+.bd-sub{font-size:12px;margin-top:8px;opacity:.8;font-weight:600;font-family:var(--num)}
+.big-diff.zero{border-color:#86EFAC;background:#F0FDF4}
+.big-diff.zero .bd-lbl,.big-diff.zero .bd-val{color:#166534}
+.big-diff.over{border-color:#93C5FD;background:#EFF6FF}
+.big-diff.over .bd-lbl,.big-diff.over .bd-val{color:#1E3A8A}
+.big-diff.short{border-color:#FCA5A5;background:#FFF5F5}
+.big-diff.short .bd-lbl,.big-diff.short .bd-val{color:#B91C1C}
 
-/* Section header */
-.section-hdr{padding:16px 12px 6px;font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.06em}
+.stat3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-b{background:#fff;border-radius:10px;padding:12px 6px;text-align:center;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.stat-b .sv{font-family:var(--num);font-size:13px;font-weight:700;margin-bottom:2px}
+.stat-b .sl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
 
-/* Toggle checkbox */
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
-.toggle{width:44px;height:26px;background:var(--gray-300);border-radius:13px;position:relative;cursor:pointer;transition:.2s;border:none}
-.toggle.on{background:var(--blue)}
-.toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.toggle.on::after{left:21px}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.dash-panel{background:#fff;border-radius:14px;padding:16px 14px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.dash-panel-lbl{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-family:'Exo 2',sans-serif}
+.dash-sales .dash-panel-lbl{color:var(--app)}
+.dash-cash  .dash-panel-lbl{color:var(--cash)}
+.dash-big{font-family:var(--num);font-size:22px;font-weight:800;line-height:1.1;word-break:break-all}
+.dash-sales .dash-big{color:#166534}.dash-cash .dash-big{color:var(--cash)}
+.dash-sub{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;font-family:var(--num)}
+.dash-divider{border:none;border-top:1px dashed var(--border);margin:12px 0}
+.dash-mini-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.dash-mini{background:var(--bg);border-radius:7px;padding:6px 4px;text-align:center}
+.dash-mini-val{font-family:var(--num);font-size:11px;font-weight:800;line-height:1.2;word-break:break-all}
+.dash-mini-val.ms{color:#166534}.dash-mini-val.hsd{color:#1E3A8A}.dash-mini-val.cng{color:#78350F}
+.dash-mini-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.dash-diff-card{border-radius:14px;padding:22px 18px;text-align:center;border:2px solid var(--border);background:#fff;margin-bottom:10px;transition:all .3s}
+.dash-diff-card.zero{border-color:#86EFAC;background:#F0FDF4}
+.dash-diff-card.over{border-color:#93C5FD;background:#EFF6FF}
+.dash-diff-card.short{border-color:#FCA5A5;background:#FFF5F5}
+.dash-diff-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:800;color:var(--muted);margin-bottom:8px;font-family:'Exo 2',sans-serif}
+.dash-diff-card.zero  .dash-diff-lbl{color:#166534}
+.dash-diff-card.over  .dash-diff-lbl{color:#1E3A8A}
+.dash-diff-card.short .dash-diff-lbl{color:#B91C1C}
+.dash-diff-val{font-family:var(--num);font-size:44px;font-weight:900;letter-spacing:-1px;color:var(--text);line-height:1}
+.dash-diff-card.zero  .dash-diff-val{color:#166534}
+.dash-diff-card.over  .dash-diff-val{color:#1E3A8A}
+.dash-diff-card.short .dash-diff-val{color:#B91C1C}
+.dash-diff-status{font-size:12px;color:var(--muted);margin-top:8px;font-weight:600;font-family:var(--num)}
 
-/* MPD selector */
-.mpd-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.mpd-pill{padding:8px 16px;border-radius:20px;border:2px solid var(--gray-200);background:#fff;cursor:pointer;font-size:14px;font-weight:500;transition:.15s}
-.mpd-pill.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
+.bb{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.97);border-top:1px solid var(--border);
+    padding:10px 14px 20px;display:flex;gap:8px;backdrop-filter:blur(8px);z-index:100;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+.btn-n{flex:2;background:linear-gradient(135deg,#1E6B8E,#155E75);color:#fff;border:none;padding:14px;border-radius:10px;
+       font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer}
+.btn-n:active{transform:scale(.98)}
+.btn-b{flex:1;background:var(--bg2);color:var(--text);border:1px solid var(--border2);padding:14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-sv{background:linear-gradient(135deg,#166534,#14532D);color:#fff;border:none;padding:14px 16px;border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;cursor:pointer}
+.add-btn{width:100%;margin-top:4px;background:transparent;border:1.5px dashed var(--border2);color:var(--muted);padding:9px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer}
+.rm-btn{background:#FFF5F5;border:1px solid #FECACA;color:#DC2626;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;flex-shrink:0}
 
-/* Shift status bar */
-.shift-bar{background:var(--green-light);border:1px solid #a7f3d0;border-radius:var(--radius);padding:10px 14px;margin:12px 12px 0;display:flex;align-items:center;justify-content:space-between}
-.shift-bar.inactive{background:var(--gray-100);border-color:var(--gray-200)}
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#166534;color:#fff;
+       padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px;opacity:0;transition:all .3s;z-index:9998;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#DC2626}
 
-/* Timestamps */
-.ts{font-size:11px;color:var(--gray-400)}
+/* DSM LOG */
+.log-day{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.log-day-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F0F9FF;border-bottom:1px solid var(--border);cursor:pointer}
+.log-day-date{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:var(--app)}
+.log-day-dsm{font-size:11px;color:var(--muted);margin-top:2px}
+.log-day-pill{font-family:'Roboto',sans-serif;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px}
+.log-day-pill.match{background:#DCFCE7;color:#15803D}
+.log-day-pill.over{background:#DBEAFE;color:#1D6FB8}
+.log-day-pill.short{background:#FEE2E2;color:#DC2626}
+.log-day-pill.open{background:#FEF3C7;color:#D97706}
+.log-entry{border:1px solid #E2E8F0;border-radius:9px;margin:10px 0;overflow:hidden}
+.log-entry-hdr{background:#F8FAFC;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+.log-entry-num{font-family:'Orbitron',monospace;font-size:10px;font-weight:900;color:var(--app)}
+.log-entry-time{font-family:'Roboto',sans-serif;font-size:10px;color:var(--muted)}
+.log-val-row{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #F1F5F9;font-size:12px}
+.log-val-row:last-child{border:none}
+.log-val-lbl{color:var(--muted);font-weight:600}
+.log-val-v{font-family:'Roboto',sans-serif;font-weight:800}
 
-/* Number keyboard feel for meters */
-.num-display{font-size:24px;font-weight:700;color:var(--gray-900);padding:14px 16px;background:var(--gray-50);border:2px solid var(--gray-200);border-radius:var(--radius);text-align:right;letter-spacing:.02em;margin-bottom:6px;min-height:58px}
-.num-display.has-value{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark)}
+/* METER TIMESTAMP */
+.meter-ts{font-size:9px;color:var(--muted);font-family:var(--num);margin-top:3px;text-align:right}
 
-/* Scrollable area */
-.scroll-area{overflow-y:auto;-webkit-overflow-scrolling:touch}
+/* SHIFT LOG */
+.se-card{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.se-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#F0F9FF;border-bottom:1px solid var(--border)}
+.se-num{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:var(--app);letter-spacing:1.5px}
+.se-time{font-family:'Roboto',sans-serif;font-size:11px;color:var(--muted)}
+.se-body{padding:11px 14px;display:flex;flex-direction:column;gap:6px}
+.se-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9}
+.se-row:last-child{border-bottom:none}
+.se-lbl{font-size:12px;color:var(--muted);font-weight:600}
+.se-val{font-family:'Roboto',sans-serif;font-size:13px;font-weight:800;color:var(--text)}
+.shift-close-btn{width:100%;margin-top:4px;background:linear-gradient(135deg,#DC2626,#B91C1C);color:#fff;border:none;padding:14px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:.5px;font-family:'Exo 2',sans-serif}
+
+.rdg-compare{margin-top:10px;border-radius:8px;overflow:hidden;border:1px solid #E2E8F0}
+.rdg-compare-row{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:12px}
+.rdg-compare-row:last-child{border-bottom:none}
+.rdg-compare-row.diff-zero{background:#F0FDF4}
+.rdg-compare-row.diff-over{background:#EFF6FF}
+.rdg-compare-row.diff-short{background:#FFF5F5}
+.rdg-cl{color:var(--muted);font-weight:600}
+.rdg-cv{font-family:'Roboto',sans-serif;font-weight:800;font-size:13px}
+.rdg-diff-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-family:'Roboto',sans-serif;font-size:11px;font-weight:800}
+.rdg-diff-pill.zero{background:#DCFCE7;color:#166534}
+.rdg-diff-pill.over{background:#DBEAFE;color:#1E3A8A}
+.rdg-diff-pill.short{background:#FEE2E2;color:#B91C1C}
+
+.oil-row{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px;margin-bottom:10px}
+.oil-row-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.oil-lbl{font-size:10px;font-weight:800;letter-spacing:1px;color:#C2410C;text-transform:uppercase}
+.oil-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.oil-total{font-family:'Roboto',sans-serif;font-size:12px;font-weight:800;color:#C2410C;margin-top:6px;text-align:right}
+
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .3s}
+.modal-ov.show{opacity:1;pointer-events:all}
+.modal{background:#fff;border-top:3px solid var(--app);border-radius:20px 20px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s}
+.modal-ov.show .modal{transform:translateY(0)}
+.modal-ttl{font-family:'Orbitron',monospace;font-size:13px;color:var(--app);letter-spacing:1px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal-x{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
 </style>
 </head>
 <body>
 
-<!-- SCREEN: Home / Shift Start -->
-<div id="screen-home" class="screen active">
-  <div class="hdr">
-    <h1>DSM Shift Manager</h1>
-    <p id="hdr-date"></p>
+<div class="hdr">
+  <div class="hdr-icon">⛽</div>
+  <div class="hdr-text">
+    <div class="hdr-title">FUELDESK PRO</div>
+    <div class="hdr-sub">DSM Daily Register</div>
   </div>
-  <div id="home-no-shift">
-    <div class="card">
-      <div class="card-title">Start New Shift</div>
-      <div class="field">
-        <label>Select DSM</label>
-        <select id="sel-dsm"></select>
+  <div class="rate-pills">
+    <div class="rpill ms"  id="pill_ms">MS —</div>
+    <div class="rpill hsd" id="pill_hsd">HSD —</div>
+    <div class="rpill cng" id="pill_cng">CNG —</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('setup')"     id="tab_setup">⚙️ Setup</div>
+  <div class="tab"        onclick="showTab('meters')"    id="tab_meters">🔢 Meters<div class="badge" id="bdg_m"></div></div>
+  <div class="tab"        onclick="showTab('payments')"  id="tab_payments">💳 Payments<div class="badge" id="bdg_p"></div></div>
+  <div class="tab"        onclick="showTab('cash')"      id="tab_cash">💵 Cash<div class="badge" id="bdg_c"></div></div>
+  <div class="tab"        onclick="showTab('dashboard')" id="tab_dashboard">📈 Dashboard</div>
+  <div class="tab"        onclick="showTab('shift')"     id="tab_shift">📋 Shift<div class="badge" id="bdg_sh"></div></div>
+  <div class="tab"        onclick="showTab('dsmlog');renderDSMLog()" id="tab_dsmlog">📅 DSM Log</div>
+</div>
+
+<div class="scroll" id="mainScroll">
+
+<!-- SETUP -->
+<div class="pg active" id="pg_setup">
+  <div class="card">
+    <div class="ch app">⛽ Fuel Rates</div>
+    <div class="cb">
+      <div class="rate-grid">
+        <div class="rbox ms"><label>MS · Petrol</label><input type="number" id="r_ms" placeholder="0.00" step="0.01" inputmode="decimal" oninput="saveRates()"><div class="rsaved" id="rs_ms"></div></div>
+        <div class="rbox hsd"><label>HSD · Diesel</label><input type="number" id="r_hsd" placeholder="0.00" step="0.01" inputmode="decimal" oninput="saveRates()"><div class="rsaved" id="rs_hsd"></div></div>
+        <div class="rbox cng"><label>CNG · Gas</label><input type="number" id="r_cng" placeholder="0.00" step="0.01" inputmode="decimal" oninput="saveRates()"><div class="rsaved" id="rs_cng"></div></div>
       </div>
-      <div class="field">
-        <label>Select MPD</label>
-        <div class="mpd-pills" id="mpd-pills"></div>
-      </div>
-      <div class="field">
-        <label>Select Nozzles to Operate</label>
-        <div class="nozzle-grid" id="nozzle-select-grid"></div>
-      </div>
-      <div id="opening-meters-section" style="display:none">
-        <div class="card-title" style="margin-top:16px">Opening Meter Readings</div>
-        <div id="opening-meters-inputs"></div>
-        <div class="field" style="margin-top:8px">
-          <label>Shift Date</label>
-          <input type="date" id="shift-date"/>
+      <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">⚠️ Rates persist until you change them</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch app">📅 Sale Date</div>
+    <div class="cb"><div class="field"><label>Date</label><input type="date" id="saleDate"></div></div>
+  </div>
+  <div class="card">
+    <div class="ch app">👤 DSM</div>
+    <div class="cb">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div class="field" style="flex:1;margin-bottom:0">
+          <label>Select DSM</label>
+          <select id="dsmSel" onchange="onDSMSelect()"><option value="">— Select DSM —</option></select>
         </div>
-        <button class="btn btn-primary" id="btn-start-shift" style="margin-top:8px">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
-          Start Shift
-        </button>
+        <button style="background:#EFF8FF;border:1.5px solid var(--app);color:var(--app);padding:11px 12px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;align-self:flex-end" onclick="openModal('dsmMod')">+ ADD</button>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Current Rates</div>
-      <div id="current-rates-display"></div>
+      <div id="dsmBanner" style="display:none;background:#EFF8FF;border:1px solid #93C5FD;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;color:var(--app)"></div>
     </div>
   </div>
-  <div id="home-active-shift" style="display:none">
-    <div class="shift-bar">
-      <div>
-        <div style="font-size:14px;font-weight:600;color:var(--green)">Shift Active</div>
-        <div class="ts" id="shift-active-info"></div>
+  <div class="card" id="mpdCard" style="display:none">
+    <div class="ch app">🏭 Select MPD Unit(s)</div>
+    <div class="cb">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Tap one or more MPD units</p>
+      <div class="mpd-grid" id="mpdGrid"></div>
+    </div>
+  </div>
+  <div class="card" id="nozzleCard" style="display:none">
+    <div class="ch app">🔩 Select Nozzles</div>
+    <div class="cb">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Tap nozzles assigned to this DSM</p>
+      <div id="nozzleSelCont"></div>
+    </div>
+  </div>
+  <div class="bb"><button class="btn-n" onclick="gotoMeters()">PROCEED TO METERS →</button></div>
+</div>
+
+<!-- METERS -->
+<div class="pg" id="pg_meters">
+  <div id="metersCont"></div>
+  <div class="bb">
+    <button class="btn-b" onclick="showTab('setup')">← Back</button>
+    <button onclick="resetMeters()" style="background:#FFF5F5;border:1.5px solid #FECACA;color:#DC2626;padding:11px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🔄 Reset</button>
+    <button class="btn-n" onclick="showTab('payments')">PAYMENTS →</button>
+  </div>
+</div>
+
+<!-- PAYMENTS -->
+<div class="pg" id="pg_payments">
+  <div class="card">
+    <div class="ch purple">📱 QR / UPI Payments</div>
+    <div class="cb">
+      <div class="qr-row">
+        <div class="qr-lbl">① UFILL</div>
+        <div class="field"><label>Amount ₹</label><input type="number" id="ufill_a" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>
       </div>
-      <span class="badge badge-green">Running</span>
+      <div class="qr-row">
+        <div class="qr-lbl">② PhonePe</div>
+        <div class="field"><label>Amount ₹</label><input type="number" id="ppe_a" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>
+      </div>
+      <div id="extraQR"></div>
+      <button class="add-btn" onclick="addExtraQR()">+ Add More QR / UPI</button>
     </div>
-    <div class="card">
-      <div class="card-title">Live Nozzle Status</div>
-      <div id="live-nozzle-status"></div>
+  </div>
+  <div class="card">
+    <div class="ch red">💳 Credit Sales</div>
+    <div class="cb">
+      <div id="creditList"></div>
+      <button class="add-btn" onclick="addCredit()">+ Add Credit Party</button>
     </div>
-    <div class="card" style="margin-top:0">
-      <button class="btn btn-primary" onclick="goToSale()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg>
-        Enter Sale / Close Shift
+  </div>
+  <div class="card">
+    <div class="ch" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#C2410C;border-color:#FED7AA">🛢️ Oil Cash Sales</div>
+    <div class="cb">
+      <div id="oilList"></div>
+      <button class="add-btn" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="addOilRow()">+ Add Oil Item</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch red">📋 Payment Totals</div>
+    <div class="cb">
+      <div class="rrow"><span class="rl">Total QR / UPI</span><span class="rv" style="color:#6D28D9" id="tot_qr">₹ 0.00</span></div>
+      <div class="rrow"><span class="rl">Total Credits</span><span class="rv" style="color:#B91C1C" id="tot_cr">₹ 0.00</span></div>
+      <div class="rrow"><span class="rl">🛢️ Oil Cash Sales</span><span class="rv" style="color:#C2410C" id="tot_oil">₹ 0.00</span></div>
+      <div class="rrow"><span class="rl">Total Deductions</span><span class="rv" style="color:#DC2626" id="tot_ded">₹ 0.00</span></div>
+    </div>
+  </div>
+  <div class="bb">
+    <button class="btn-b" onclick="showTab('meters')">← Back</button>
+    <button class="btn-n" onclick="showTab('cash')">CASH COUNT →</button>
+  </div>
+</div>
+
+<!-- CASH -->
+<div class="pg" id="pg_cash">
+  <div class="card">
+    <div class="ch cash">💵 Cash Denomination Count</div>
+    <div class="cb">
+      <div class="denom-wrap">
+        <div class="denom-hdr"><span>Note</span><span>Count</span><span>Total ₹</span></div>
+        <div id="denomRows"></div>
+        <div class="denom-total-row"><span class="dtl">💰 Cash Total</span><span class="dtv" id="cashTotDisp">₹ 0.00</span></div>
+      </div>
+      <div class="coins-row">
+        <label>🪙 Coins Total</label>
+        <input class="coins-input" type="number" id="coinsTotal" placeholder="0.00" step="0.50" inputmode="decimal" oninput="calcCash()">
+      </div>
+      <!-- SAVE CASH BUTTON -->
+      <button onclick="saveCashDeposit()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#92400E,#78350F);color:#fff;border:none;padding:15px;border-radius:10px;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 14px rgba(146,64,14,.3)">
+        💰 SAVE CASH DEPOSIT
       </button>
     </div>
   </div>
-</div>
 
-<!-- SCREEN: Active Sale (Closing Meters + Payments) -->
-<div id="screen-sale" class="screen">
-  <div class="hdr">
-    <h1>Shift Sale Entry</h1>
-    <p id="sale-hdr-info"></p>
-  </div>
-  
-  <div class="section-hdr">Closing Meters</div>
-  <div id="closing-meters-section"></div>
-
-  <div class="section-hdr">Card Payments</div>
+  <!-- SAVED DEPOSITS LOG -->
   <div class="card">
-    <div class="card-title">Card Payment Entries</div>
-    <div id="card-payment-list"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-      <div class="field" style="margin:0">
-        <label>Amount (₹)</label>
-        <input type="number" id="card-amount" placeholder="0.00"/>
+    <div class="ch cash">📋 Cash Deposits This Shift</div>
+    <div class="cb">
+      <div id="cashDepositLog">
+        <p style="text-align:center;color:var(--muted);font-size:13px;padding:10px 0">No deposits saved yet</p>
       </div>
-      <div class="field" style="margin:0">
-        <label>Litres</label>
-        <input type="number" id="card-litres" placeholder="0.00"/>
+      <div class="cash-saved-total" id="cashSavedTotalRow" style="display:none">
+        <span class="cst-l">Total Cash Deposited</span>
+        <span class="cst-v" id="cashSavedTotalAmt">₹ 0.00</span>
       </div>
     </div>
-    <button class="btn btn-secondary" style="margin-top:8px" onclick="addCardPayment()">+ Add Card Entry</button>
-    <div style="margin-top:10px;font-weight:700;color:var(--blue)">Total Card: ₹<span id="card-total">0.00</span> | <span id="card-ltr-total">0.00</span> L</div>
   </div>
 
-  <div class="section-hdr">QR Payments</div>
-  <div class="card">
-    <div class="card-title">QR / UPI Payment Entries</div>
-    <div id="qr-payment-list"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-      <div class="field" style="margin:0">
-        <label>Amount (₹)</label>
-        <input type="number" id="qr-amount" placeholder="0.00"/>
-      </div>
-      <div class="field" style="margin:0">
-        <label>Litres</label>
-        <input type="number" id="qr-litres" placeholder="0.00"/>
-      </div>
-    </div>
-    <button class="btn btn-secondary" style="margin-top:8px" onclick="addQRPayment()">+ Add QR Entry</button>
-    <div style="margin-top:10px;font-weight:700;color:var(--blue)">Total QR: ₹<span id="qr-total">0.00</span> | <span id="qr-ltr-total">0.00</span> L</div>
-  </div>
-
-  <div class="section-hdr">Cash Deposits to Cashier</div>
-  <div class="card">
-    <div class="card-title">Cash Deposit Log</div>
-    <div id="cash-deposit-log"></div>
-    <button class="btn btn-secondary" style="margin-top:8px" onclick="openCashCalc()">+ New Cash Deposit</button>
-    <div style="margin-top:10px;font-weight:700;color:var(--green)">Total Deposited: ₹<span id="total-deposited-display">0.00</span></div>
-  </div>
-
-  <div class="section-hdr">Close Shift & Reconcile</div>
-  <div class="card">
-    <button class="btn btn-red" onclick="closeShift()">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
-      Close Shift & Reconcile
-    </button>
+  <div class="bb" style="flex-direction:column;gap:8px">
+    <button onclick="closeShiftFinal()" style="width:100%;background:linear-gradient(135deg,#166534,#14532D);color:#fff;border:none;padding:16px;border-radius:12px;font-family:'Orbitron',monospace;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 15px rgba(22,101,52,.3)">🔒 CLOSE SHIFT & VERIFY</button>
+    <button class="btn-b" onclick="showTab('payments')" style="width:100%">← Back to Payments</button>
   </div>
 </div>
 
-<!-- SCREEN: Reconciliation Result -->
-<div id="screen-recon" class="screen">
-  <div class="hdr">
-    <h1>Shift Reconciliation</h1>
-    <p id="recon-hdr-info"></p>
+<!-- DASHBOARD -->
+<div class="pg" id="pg_dashboard">
+  <div id="dashCont">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:40px;margin-bottom:10px">📈</div>
+      <div style="font-weight:700">Save entries to see dashboard</div>
+    </div>
   </div>
-  <div id="recon-content"></div>
-  <div class="card" style="margin-top:0">
-    <button class="btn btn-primary" onclick="showScreen('home')">Back to Home</button>
-  </div>
+  <button class="btn-n" onclick="refreshDashboard()" style="width:100%;border-radius:10px;margin-top:8px">↻ Refresh</button>
 </div>
 
-<!-- SCREEN: Shift Log -->
-<div id="screen-log" class="screen">
-  <div class="hdr">
-    <h1>Shift Log</h1>
-    <p>Past shift records</p>
-  </div>
-  <div id="log-content"></div>
-</div>
-
-<!-- SCREEN: Settings -->
-<div id="screen-settings" class="screen">
-  <div class="hdr">
-    <h1>Settings</h1>
-    <p>Configure pump, rates & staff</p>
-  </div>
-
-  <div class="section-hdr">Fuel Rates</div>
-  <div class="card">
-    <div class="alert alert-blue" style="margin-bottom:12px">Rates apply to all future sales until updated.</div>
-    <div class="field">
-      <label>Petrol Rate (₹/L)</label>
-      <input type="number" id="rate-petrol" placeholder="e.g. 104.50" step="0.01"/>
-    </div>
-    <div class="field">
-      <label>Diesel Rate (₹/L)</label>
-      <input type="number" id="rate-diesel" placeholder="e.g. 91.00" step="0.01"/>
-    </div>
-    <div class="field">
-      <label>CNG Rate (₹/kg)</label>
-      <input type="number" id="rate-cng" placeholder="e.g. 76.00" step="0.01"/>
-    </div>
-    <div id="rate-history" style="margin-top:4px;font-size:12px;color:var(--gray-500)"></div>
-    <button class="btn btn-primary" style="margin-top:12px" onclick="saveRates()">Save Rates</button>
-  </div>
-
-  <div class="section-hdr">Staff</div>
-  <div class="card">
-    <div class="field">
-      <label>Cashier Name</label>
-      <input type="text" id="cashier-name" placeholder="Name of cashier on duty"/>
-    </div>
-    <div class="card-title" style="margin-top:8px">DSM List</div>
-    <div id="dsm-list"></div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <input type="text" id="new-dsm" placeholder="Add DSM name" style="flex:1"/>
-      <button class="btn btn-primary btn-sm" onclick="addDSM()">Add</button>
-    </div>
-    <button class="btn btn-secondary" style="margin-top:10px" onclick="saveStaff()">Save Staff Settings</button>
-  </div>
-
-  <div class="section-hdr">MPD Configuration</div>
-  <div class="card">
-    <div id="mpd-config-list"></div>
-    <div style="display:flex;gap:8px;margin-top:10px;align-items:flex-end">
-      <div class="field" style="flex:1;margin:0">
-        <label>MPD Name</label>
-        <input type="text" id="new-mpd-name" placeholder="e.g. MPD-1"/>
-      </div>
-      <div class="field" style="flex:1;margin:0">
-        <label>Fuel Type</label>
-        <select id="new-mpd-fuel">
-          <option>Petrol</option>
-          <option>Diesel</option>
-          <option>CNG</option>
-        </select>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-bottom:0" onclick="addMPD()">Add</button>
+<!-- SHIFT -->
+<div class="pg" id="pg_shift">
+  <div id="shiftCont">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">📋</div>
+      <div style="font-weight:700">No entries yet</div>
+      <div style="font-size:12px;margin-top:6px">Complete an entry and press Save to begin</div>
     </div>
   </div>
 </div>
 
-<!-- MODAL: Cash Calculator -->
-<div id="modal-cash" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);align-items:flex-end">
-  <div style="background:#fff;border-radius:var(--radius) var(--radius) 0 0;padding:20px;max-height:90vh;overflow-y:auto;width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="font-size:17px;font-weight:600">Cash Deposit Calculator</h2>
-      <button onclick="closeCashCalc()" style="background:none;border:none;font-size:22px;color:var(--gray-500);cursor:pointer">×</button>
-    </div>
-    <div id="denom-rows"></div>
-    <div style="background:var(--green-light);padding:14px;border-radius:var(--radius);margin:12px 0;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:14px;font-weight:500;color:var(--green)">Total Cash</span>
-      <span style="font-size:22px;font-weight:700;color:var(--green)">₹<span id="calc-total">0.00</span></span>
-    </div>
-    <div class="field">
-      <label>Deposit Note (optional)</label>
-      <input type="text" id="deposit-note" placeholder="e.g. Morning deposit, 10:30 AM"/>
-    </div>
-    <button class="btn btn-green" onclick="confirmCashDeposit()">Confirm Deposit</button>
+<!-- DSM LOG (7-day rolling) -->
+<div class="pg" id="pg_dsmlog">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-family:'Orbitron',monospace;font-size:11px;color:var(--app);letter-spacing:1.5px">7-DAY DSM LOG</div>
+    <div style="font-size:10px;color:var(--muted)">Auto-purges after 7 days</div>
+  </div>
+  <div id="dsmLogCont"></div>
+</div>
+
+</div><!-- /scroll -->
+
+<!-- ADD DSM MODAL -->
+<div class="modal-ov" id="dsmMod">
+  <div class="modal">
+    <div class="modal-ttl">ADD NEW DSM <button class="modal-x" onclick="closeModal('dsmMod')">✕</button></div>
+    <div class="field"><label>Full Name</label><input type="text" id="newDSM" placeholder="Enter DSM name"></div>
+    <button class="btn-n" style="width:100%" onclick="confirmAddDSM()">ADD DSM</button>
   </div>
 </div>
 
-<!-- Bottom Nav -->
-<nav class="bnav">
-  <button onclick="showScreen('home')" id="nav-home" class="active">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
-    <span>Home</span>
-  </button>
-  <button onclick="goToSale()" id="nav-sale">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-    <span>Sale</span>
-  </button>
-  <button onclick="showScreen('log')" id="nav-log">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>
-    <span>Log</span>
-  </button>
-  <button onclick="showScreen('settings')" id="nav-settings">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-    <span>Settings</span>
-  </button>
-</nav>
+<div class="toast" id="toast"></div>
 
 <script>
-// ==================== STATE ====================
-const DENOMS = [
-  {val:500,label:'₹500',type:'note'},
-  {val:200,label:'₹200',type:'note'},
-  {val:100,label:'₹100',type:'note'},
-  {val:50,label:'₹50',type:'note'},
-  {val:20,label:'₹20',type:'note'},
-  {val:10,label:'₹10',type:'note'},
-  {val:5,label:'5 coins',type:'coin'},
-  {val:2,label:'2 coins',type:'coin'},
-  {val:1,label:'1 coins',type:'coin'},
-];
+const MPD = {
+  MPD1:{ label:'MPD 1', desc:'All 4 nozzles — MS Petrol',          nozzles:{N1:'ms',N2:'ms',N3:'ms',N4:'ms'} },
+  MPD2:{ label:'MPD 2', desc:'N1,N2=HSD Diesel | N3,N4=MS Petrol', nozzles:{N1:'hsd',N2:'hsd',N3:'ms',N4:'ms'} },
+  MPD3:{ label:'MPD 3', desc:'All 4 nozzles — HSD Diesel',         nozzles:{N1:'hsd',N2:'hsd',N3:'hsd',N4:'hsd'} },
+  MPD4:{ label:'MPD 4', desc:'2 nozzles — CNG only',               nozzles:{N1:'cng',N2:'cng'} }
+};
+const DENOMS = [500,200,100,50,20,10];
+let S = { rates:{ms:0,hsd:0,cng:0}, dsmList:[], dsm:'', selMPDs:[], selNozzles:{}, meters:{}, shiftLog:[], allShifts:[], cashDeposits:[] };
+let eqrN=0, crN=0, oilN=0;
+let OIL_ITEMS=["MAK 4T PLUS 900 ML","MAK 4T SCOOTECH 800 ML","MAK ADBLUE 10 LTR","MAK ADBLUE 20 LTR","MAK BRAKE FLUID 250ML","MAK FLEET Ci4+ 210 LTR BARREL","MAK FLEET MINI Ci4+ 3 LTR","MAK GE 500 ML","MAK HONDA POWER 47 900ML","MAK HYDROL 68 210 LTR BARREL","MAK REDI KOOL 1 LTR","MAK SPIROL 85 5 LTR"];
 
-function S(key,def){
-  try{const v=localStorage.getItem(key);return v!=null?JSON.parse(v):def}catch{return def}
+window.onload = ()=>{
+  loadStorage();
+  document.getElementById('saleDate').value = new Date().toISOString().split('T')[0];
+  buildMPDGrid(); buildDenomRows(); renderRatePills(); addCredit();
+  S.shiftLog=[]; S.cashDeposits=[];
+  localStorage.removeItem('fdp_shift'); localStorage.removeItem('fdp_cash_deps');
+  purgeOldDSMLog();
+  renderShiftLog();
+};
+
+function loadStorage(){
+  try{
+    const s=JSON.parse(localStorage.getItem('fdp_s')||'{}');
+    S.rates=s.rates||{ms:0,hsd:0,cng:0}; S.dsmList=s.dsmList||[];
+    if(S.rates.ms)  document.getElementById('r_ms').value=S.rates.ms;
+    if(S.rates.hsd) document.getElementById('r_hsd').value=S.rates.hsd;
+    if(S.rates.cng) document.getElementById('r_cng').value=S.rates.cng;
+    updateRateSaved(); renderRatePills();
+    S.shiftLog=JSON.parse(localStorage.getItem('fdp_shift')||'[]');
+    S.allShifts=JSON.parse(localStorage.getItem('fdp_allshifts')||'[]');
+    S.cashDeposits=JSON.parse(localStorage.getItem('fdp_cash_deps')||'[]');
+    rebuildDSMDrop();
+    renderCashDepositLog();
+  }catch(e){}
 }
-function SS(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function persist(){ localStorage.setItem('fdp_s',JSON.stringify({rates:S.rates,dsmList:S.dsmList})); }
 
-function getSettings(){
-  return {
-    dsms: S('dsm_list',[]),
-    cashier: S('cashier_name','Cashier'),
-    rates: S('fuel_rates',{petrol:0,diesel:0,cng:0}),
-    rateHistory: S('rate_history',[]),
-    mpds: S('mpd_list',[
-      {id:'mpd1',name:'MPD-1',fuel:'Petrol'},
-      {id:'mpd2',name:'MPD-2',fuel:'Diesel'},
-    ])
-  };
+/* RATES */
+function saveRates(){
+  S.rates.ms=parseFloat(document.getElementById('r_ms').value)||0;
+  S.rates.hsd=parseFloat(document.getElementById('r_hsd').value)||0;
+  S.rates.cng=parseFloat(document.getElementById('r_cng').value)||0;
+  persist(); updateRateSaved(); renderRatePills();
 }
-
-function getActiveShift(){return S('active_shift',null)}
-function setActiveShift(s){SS('active_shift',s)}
-function getShiftLog(){return S('shift_log',[])}
-
-// ==================== NAVIGATION ====================
-function showScreen(name){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-'+name).classList.add('active');
-  document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('active'));
-  const nb=document.getElementById('nav-'+name);
-  if(nb)nb.classList.add('active');
-  if(name==='home')renderHome();
-  if(name==='log')renderLog();
-  if(name==='settings')renderSettings();
-  if(name==='sale')renderSale();
+function updateRateSaved(){
+  ['ms','hsd','cng'].forEach(f=>{ const v=S.rates[f]; document.getElementById('rs_'+f).textContent=v>0?'✓ ₹'+v.toFixed(2)+' saved':''; });
 }
-
-function goToSale(){
-  if(!getActiveShift()){
-    alert('No active shift. Please start a shift first.');
-    return;
-  }
-  showScreen('sale');
-}
-
-// ==================== HOME ====================
-function renderHome(){
-  const today=new Date();
-  document.getElementById('hdr-date').textContent=today.toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  document.getElementById('shift-date').value=today.toISOString().split('T')[0];
-  
-  const cfg=getSettings();
-  const shift=getActiveShift();
-  
-  // Rates display
-  const r=cfg.rates;
-  document.getElementById('current-rates-display').innerHTML=`
-    <div class="tiles">
-      <div class="tile"><div class="tile-val" style="color:var(--amber)">₹${r.petrol||'—'}</div><div class="tile-label">Petrol /L</div></div>
-      <div class="tile"><div class="tile-val" style="color:var(--blue)">₹${r.diesel||'—'}</div><div class="tile-label">Diesel /L</div></div>
-      <div class="tile"><div class="tile-val" style="color:var(--green)">₹${r.cng||'—'}</div><div class="tile-label">CNG /kg</div></div>
-      <div class="tile"><div class="tile-val" style="color:var(--gray-700)">${cfg.cashier||'—'}</div><div class="tile-label">Cashier</div></div>
-    </div>`;
-
-  if(shift){
-    document.getElementById('home-no-shift').style.display='none';
-    document.getElementById('home-active-shift').style.display='block';
-    document.getElementById('shift-active-info').textContent=
-      `${shift.dsmName} · ${shift.mpdName} · Started ${new Date(shift.startTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
-    renderLiveNozzleStatus(shift);
-  } else {
-    document.getElementById('home-no-shift').style.display='block';
-    document.getElementById('home-active-shift').style.display='none';
-    renderDSMSelect();
-    renderMPDPills();
-  }
+function renderRatePills(){
+  const r=S.rates;
+  document.getElementById('pill_ms').textContent  ='MS '  +(r.ms  >0?'₹'+r.ms.toFixed(2) :'—');
+  document.getElementById('pill_hsd').textContent ='HSD ' +(r.hsd >0?'₹'+r.hsd.toFixed(2):'—');
+  document.getElementById('pill_cng').textContent ='CNG ' +(r.cng >0?'₹'+r.cng.toFixed(2):'—');
 }
 
-function renderDSMSelect(){
-  const cfg=getSettings();
-  const sel=document.getElementById('sel-dsm');
-  sel.innerHTML='<option value="">-- Select DSM --</option>'+
-    cfg.dsms.map(d=>`<option value="${d}">${d}</option>`).join('');
+/* DSM */
+function rebuildDSMDrop(){
+  const sel=document.getElementById('dsmSel'),cur=sel.value;
+  sel.innerHTML='<option value="">— Select DSM —</option>';
+  S.dsmList.forEach(d=>{ const o=document.createElement('option'); o.value=o.textContent=d.name; sel.appendChild(o); });
+  if(cur) sel.value=cur;
+}
+function confirmAddDSM(){
+  const nm=document.getElementById('newDSM').value.trim();
+  if(!nm){showToast('Enter a name','err');return;}
+  if(S.dsmList.find(d=>d.name.toLowerCase()===nm.toLowerCase())){showToast('Already exists','err');return;}
+  S.dsmList.push({name:nm}); persist(); rebuildDSMDrop();
+  document.getElementById('dsmSel').value=nm; onDSMSelect();
+  closeModal('dsmMod'); showToast('✅ DSM added: '+nm);
+}
+function onDSMSelect(){
+  const nm=document.getElementById('dsmSel').value; S.dsm=nm;
+  const ban=document.getElementById('dsmBanner'),mc=document.getElementById('mpdCard');
+  if(!nm){ban.style.display='none';mc.style.display='none';document.getElementById('nozzleCard').style.display='none';return;}
+  ban.style.display='block'; ban.textContent='👤 '+nm;
+  mc.style.display='block'; S.selMPDs=[]; S.selNozzles={};
+  updateMPDGrid(); document.getElementById('nozzleCard').style.display='none';
 }
 
-function renderMPDPills(){
-  const cfg=getSettings();
-  const container=document.getElementById('mpd-pills');
-  container.innerHTML=cfg.mpds.map(m=>
-    `<div class="mpd-pill" data-id="${m.id}" onclick="selectMPD('${m.id}')">${m.name}<br><small style="font-size:10px;opacity:.7">${m.fuel}</small></div>`
-  ).join('');
-  document.getElementById('nozzle-select-grid').innerHTML='';
-  document.getElementById('opening-meters-section').style.display='none';
-}
-
-let selectedMPD=null;
-let selectedNozzles=[];
-
-function selectMPD(id){
-  selectedMPD=id;
-  selectedNozzles=[];
-  document.querySelectorAll('.mpd-pill').forEach(p=>{
-    p.classList.toggle('active',p.dataset.id===id);
+/* MPD */
+function buildMPDGrid(){
+  const g=document.getElementById('mpdGrid'); g.innerHTML='';
+  Object.keys(MPD).forEach(mk=>{
+    const cfg=MPD[mk];
+    const chips=Object.entries(cfg.nozzles).map(([n,f])=>`<div class="mnchip ${f}">${n} <span style="font-size:8px">${f.toUpperCase()}</span></div>`).join('');
+    const div=document.createElement('div'); div.className='mpd-card'; div.id='mc_'+mk;
+    div.innerHTML=`<div class="mpd-chk">✓</div><div class="mpd-ttl">${cfg.label}</div><div class="mpd-nrow">${chips}</div><div class="mpd-desc">${cfg.desc}</div>`;
+    div.onclick=()=>toggleMPD(mk); g.appendChild(div);
   });
-  const cfg=getSettings();
-  const mpd=cfg.mpds.find(m=>m.id===id);
-  const grid=document.getElementById('nozzle-select-grid');
-  grid.innerHTML=['N1','N2','N3','N4'].map(n=>
-    `<div class="nozzle-card" data-nozzle="${n}" onclick="toggleNozzle('${n}',this)">
-      <h3>${n}</h3>
-      <p>${mpd?mpd.fuel:''}</p>
-    </div>`
-  ).join('');
-  document.getElementById('opening-meters-section').style.display='none';
 }
-
-function toggleNozzle(n,el){
-  const i=selectedNozzles.indexOf(n);
-  if(i>=0){selectedNozzles.splice(i,1);el.classList.remove('selected')}
-  else{selectedNozzles.push(n);el.classList.add('selected')}
-  renderOpeningMeterInputs();
+function updateMPDGrid(){ Object.keys(MPD).forEach(k=>{ const el=document.getElementById('mc_'+k); if(el) el.classList.toggle('sel',S.selMPDs.includes(k)); }); }
+function toggleMPD(mk){
+  const i=S.selMPDs.indexOf(mk);
+  if(i===-1){ S.selMPDs.push(mk); S.selNozzles[mk]=Object.keys(MPD[mk].nozzles); }
+  else { S.selMPDs.splice(i,1); delete S.selNozzles[mk]; }
+  updateMPDGrid(); buildNozzleSelector();
 }
-
-function renderOpeningMeterInputs(){
-  const sec=document.getElementById('opening-meters-section');
-  const inp=document.getElementById('opening-meters-inputs');
-  if(selectedNozzles.length===0){sec.style.display='none';return}
-  sec.style.display='block';
-  inp.innerHTML=selectedNozzles.map(n=>
-    `<div class="meter-row">
-      <div class="meter-label">${n} Open</div>
-      <div class="meter-input"><input type="number" id="open-${n}" placeholder="Opening reading" step="0.01"/></div>
-    </div>`
-  ).join('');
-}
-
-document.getElementById('btn-start-shift').addEventListener('click',()=>{
-  const dsmEl=document.getElementById('sel-dsm');
-  const dsm=dsmEl.value;
-  if(!dsm){alert('Please select a DSM');return}
-  if(!selectedMPD){alert('Please select an MPD');return}
-  if(selectedNozzles.length===0){alert('Select at least one nozzle');return}
-  
-  const cfg=getSettings();
-  const mpd=cfg.mpds.find(m=>m.id===selectedMPD);
-  
-  const nozzles={};
-  let ok=true;
-  selectedNozzles.forEach(n=>{
-    const v=parseFloat(document.getElementById('open-'+n).value);
-    if(isNaN(v)){alert(`Enter opening meter for ${n}`);ok=false;return}
-    nozzles[n]={opening:v,closing:null,openTs:new Date().toISOString(),closeTs:null};
+function buildNozzleSelector(){
+  const card=document.getElementById('nozzleCard'),cont=document.getElementById('nozzleSelCont');
+  if(!S.selMPDs.length){card.style.display='none';return;}
+  card.style.display='block'; cont.innerHTML='';
+  S.selMPDs.forEach((mk,idx)=>{
+    const cfg=MPD[mk],sec=document.createElement('div'); sec.style.marginBottom='14px';
+    const ttl=document.createElement('div');
+    ttl.style.cssText='font-family:Orbitron,monospace;font-size:11px;font-weight:700;color:var(--app);letter-spacing:1.5px;margin-bottom:8px';
+    ttl.textContent=cfg.label+' — Nozzles'; sec.appendChild(ttl);
+    const row=document.createElement('div'); row.className='nsel-grid';
+    Object.entries(cfg.nozzles).forEach(([nz,fuel])=>{
+      const sel=(S.selNozzles[mk]||[]).includes(nz);
+      const chip=document.createElement('div');
+      chip.className=`nsel-chip ${fuel}-c${sel?' sel':''}`;
+      chip.innerHTML=`${nz}<span class="nf">${fuel.toUpperCase()}</span>`;
+      chip.onclick=()=>{
+        chip.classList.toggle('sel');
+        if(!S.selNozzles[mk]) S.selNozzles[mk]=[];
+        const a=S.selNozzles[mk],i=a.indexOf(nz);
+        if(i===-1) a.push(nz); else a.splice(i,1);
+      };
+      row.appendChild(chip);
+    });
+    sec.appendChild(row); cont.appendChild(sec);
+    if(idx<S.selMPDs.length-1){ const hr=document.createElement('hr'); hr.className='dl'; cont.appendChild(hr); }
   });
-  if(!ok)return;
-  
-  const shift={
-    id:'shift_'+Date.now(),
-    dsmName:dsm,
-    cashier:cfg.cashier,
-    mpdId:selectedMPD,
-    mpdName:mpd?mpd.name:'MPD',
-    mpdFuel:mpd?mpd.fuel:'Petrol',
-    date:document.getElementById('shift-date').value,
-    startTime:new Date().toISOString(),
-    endTime:null,
-    nozzles,
-    rates:cfg.rates,
-    cardPayments:[],
-    qrPayments:[],
-    cashDeposits:[],
-    closed:false
-  };
-  setActiveShift(shift);
-  selectedMPD=null; selectedNozzles=[];
-  renderHome();
-});
-
-function renderLiveNozzleStatus(shift){
-  const container=document.getElementById('live-nozzle-status');
-  container.innerHTML=Object.entries(shift.nozzles).map(([n,data])=>`
-    <div class="meter-row">
-      <div class="meter-label">${n}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;color:var(--gray-500)">Open: <strong>${data.opening.toFixed(2)}</strong></div>
-        ${data.closing!=null?`<div style="font-size:13px;color:var(--green)">Close: <strong>${data.closing.toFixed(2)}</strong></div>`:'<div class="ts">Not closed yet</div>'}
-      </div>
-      <span class="badge ${data.closing!=null?'badge-green':'badge-amber'}">${data.closing!=null?'Done':'Active'}</span>
-    </div>
-  `).join('');
 }
 
-// ==================== SALE SCREEN ====================
-function renderSale(){
-  const shift=getActiveShift();
-  if(!shift)return;
-  document.getElementById('sale-hdr-info').textContent=`${shift.dsmName} · ${shift.mpdName} · ${shift.date}`;
-  
-  // Closing meters
-  const sec=document.getElementById('closing-meters-section');
-  sec.innerHTML=`<div class="card"><div class="card-title">Enter Closing Meter Readings</div>`+
-    Object.entries(shift.nozzles).map(([n,data])=>`
-      <div class="meter-row">
-        <div class="meter-label">${n}</div>
-        <div style="flex:1">
-          <div class="ts">Open: ${data.opening.toFixed(2)}</div>
-          <div style="margin-top:4px;display:flex;gap:6px;align-items:center">
-            <input type="number" id="close-${n}" placeholder="Closing reading" step="0.01"
-              value="${data.closing!=null?data.closing:''}"
-              style="flex:1;font-size:15px"
-              onchange="saveClosingMeter('${n}',this.value)"/>
-            ${data.closing!=null?`<span class="badge badge-green" style="white-space:nowrap">${(data.closing-data.opening).toFixed(2)} L</span>`:''}
+function gotoMeters(){
+  if(!S.dsm){showToast('Select a DSM','err');return;}
+  if(!S.selMPDs.length){showToast('Select at least one MPD','err');return;}
+  const totN=Object.values(S.selNozzles).reduce((s,a)=>s+a.length,0);
+  if(!totN){showToast('Select at least one nozzle','err');return;}
+  const need=new Set();
+  S.selMPDs.forEach(mk=>(S.selNozzles[mk]||[]).forEach(nz=>need.add(MPD[mk].nozzles[nz])));
+  for(const f of need){ if(!S.rates[f]){showToast(`Enter ${f.toUpperCase()} rate first`,'err');return;} }
+  buildMetersPage(); showTab('meters');
+}
+
+/* ═══════════ METERS ═══════════ */
+function buildMetersPage(){
+  const c=document.getElementById('metersCont'); c.innerHTML='';
+  const prev=S.meters||{};
+  S.meters={};
+  const info=document.createElement('div'); info.className='card';
+  info.innerHTML=`<div class="ch app" style="justify-content:space-between">
+    <span>👤 ${S.dsm} · ${S.selMPDs.map(k=>MPD[k].label).join(' + ')}</span>
+    <span style="font-size:9px;color:var(--muted)">${document.getElementById('saleDate').value}</span></div>`;
+  c.appendChild(info);
+  S.selMPDs.forEach(mk=>{
+    const cfg=MPD[mk],selNz=S.selNozzles[mk]||[];
+    const mhdr=document.createElement('div');
+    mhdr.style.cssText='font-family:Orbitron,monospace;font-size:11px;font-weight:700;color:var(--app);letter-spacing:2px;padding:4px 2px 10px';
+    mhdr.textContent='🏭 '+cfg.label; c.appendChild(mhdr);
+    selNz.forEach(nz=>{
+      const fuel=cfg.nozzles[nz],rate=S.rates[fuel]||0,key=mk+'_'+nz;
+      S.meters[key]=prev[key]?{...prev[key],fuel,rate,mpd:mk,nozzle:nz}:{readings:[{open:'',close:'',openTs:'',closeTs:''}],fuel,rate,mpd:mk,nozzle:nz};
+      const m=S.meters[key];
+      const maxed=m.readings.length>=5;
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`<div class="ch ${fuel}">${cfg.label} · <strong>${nz}</strong>
+        <span class="nm-badge ${fuel}" style="margin-left:8px">${fuel.toUpperCase()}</span>
+        <span style="font-size:9px;color:var(--muted);margin-left:auto">₹${rate.toFixed(2)}/L</span></div>
+        <div class="cb">
+          <div id="nreadings_${key}"></div>
+          <button class="add-reading-btn" id="addrdg_${key}" onclick="addReading('${key}')" ${maxed?'style="display:none"':''}>＋ Add Next Reading</button>
+          <div class="nozzle-day-total" id="nday_${key}" style="display:none">
+            <div class="nm-res ${fuel}"><div class="rv" id="nday_${key}_l">—</div><div class="rl">Day Total Litres</div></div>
+            <div class="nm-res ${fuel}"><div class="rv" id="nday_${key}_a">—</div><div class="rl">Day Total ₹</div></div>
           </div>
-          ${data.closing!=null?`<div class="ts" style="margin-top:2px">Closed: ${new Date(data.closeTs).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
-        </div>
-      </div>`
-    ).join('')+`</div>`;
-  
-  renderCardPayments(shift);
-  renderQRPayments(shift);
-  renderCashDeposits(shift);
-}
-
-function saveClosingMeter(nozzle,val){
-  const shift=getActiveShift();
-  if(!shift)return;
-  const v=parseFloat(val);
-  if(isNaN(v)||v<shift.nozzles[nozzle].opening){
-    alert('Closing meter must be ≥ opening meter');
-    document.getElementById('close-'+nozzle).value='';
-    return;
-  }
-  shift.nozzles[nozzle].closing=v;
-  shift.nozzles[nozzle].closeTs=new Date().toISOString();
-  setActiveShift(shift);
-  renderSale();
-  // Log the edit
-  addMeterEditLog(shift,nozzle,v);
-}
-
-function addMeterEditLog(shift,nozzle,val){
-  const log=S('meter_edit_log',[]);
-  log.push({shiftId:shift.id,nozzle,value:val,ts:new Date().toISOString()});
-  SS('meter_edit_log',log);
-}
-
-// Card payments
-function renderCardPayments(shift){
-  const list=document.getElementById('card-payment-list');
-  list.innerHTML=shift.cardPayments.map((p,i)=>`
-    <div class="deposit-item">
-      <div><div style="font-size:14px;font-weight:500">₹${p.amount.toFixed(2)}</div><div class="ts">${p.litres.toFixed(2)} L · ${new Date(p.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div>
-      <button class="btn btn-sm btn-secondary" onclick="removeCardPayment(${i})">✕</button>
-    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No card entries yet</p>';
-  const tot=shift.cardPayments.reduce((a,p)=>a+p.amount,0);
-  const ltr=shift.cardPayments.reduce((a,p)=>a+p.litres,0);
-  document.getElementById('card-total').textContent=tot.toFixed(2);
-  document.getElementById('card-ltr-total').textContent=ltr.toFixed(2);
-}
-
-function addCardPayment(){
-  const shift=getActiveShift();
-  const amt=parseFloat(document.getElementById('card-amount').value);
-  const ltr=parseFloat(document.getElementById('card-litres').value);
-  if(isNaN(amt)||amt<=0){alert('Enter valid card amount');return}
-  if(isNaN(ltr)||ltr<=0){alert('Enter valid litres');return}
-  shift.cardPayments.push({amount:amt,litres:ltr,ts:new Date().toISOString()});
-  setActiveShift(shift);
-  document.getElementById('card-amount').value='';
-  document.getElementById('card-litres').value='';
-  renderSale();
-}
-
-function removeCardPayment(i){
-  const shift=getActiveShift();
-  shift.cardPayments.splice(i,1);
-  setActiveShift(shift);
-  renderSale();
-}
-
-// QR payments
-function renderQRPayments(shift){
-  const list=document.getElementById('qr-payment-list');
-  list.innerHTML=shift.qrPayments.map((p,i)=>`
-    <div class="deposit-item">
-      <div><div style="font-size:14px;font-weight:500">₹${p.amount.toFixed(2)}</div><div class="ts">${p.litres.toFixed(2)} L · ${new Date(p.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div>
-      <button class="btn btn-sm btn-secondary" onclick="removeQRPayment(${i})">✕</button>
-    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No QR entries yet</p>';
-  const tot=shift.qrPayments.reduce((a,p)=>a+p.amount,0);
-  const ltr=shift.qrPayments.reduce((a,p)=>a+p.litres,0);
-  document.getElementById('qr-total').textContent=tot.toFixed(2);
-  document.getElementById('qr-ltr-total').textContent=ltr.toFixed(2);
-}
-
-function addQRPayment(){
-  const shift=getActiveShift();
-  const amt=parseFloat(document.getElementById('qr-amount').value);
-  const ltr=parseFloat(document.getElementById('qr-litres').value);
-  if(isNaN(amt)||amt<=0){alert('Enter valid QR amount');return}
-  if(isNaN(ltr)||ltr<=0){alert('Enter valid litres');return}
-  shift.qrPayments.push({amount:amt,litres:ltr,ts:new Date().toISOString()});
-  setActiveShift(shift);
-  document.getElementById('qr-amount').value='';
-  document.getElementById('qr-litres').value='';
-  renderSale();
-}
-
-function removeQRPayment(i){
-  const shift=getActiveShift();
-  shift.qrPayments.splice(i,1);
-  setActiveShift(shift);
-  renderSale();
-}
-
-// Cash deposits
-function renderCashDeposits(shift){
-  const list=document.getElementById('cash-deposit-log');
-  list.innerHTML=shift.cashDeposits.map((d,i)=>`
-    <div class="deposit-item">
-      <div>
-        <div style="font-size:15px;font-weight:600;color:var(--green)">₹${d.total.toFixed(2)}</div>
-        <div class="ts">${d.note||'Cash deposit'} · ${new Date(d.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
-        <div style="font-size:11px;color:var(--gray-400)">${formatDenomSummary(d.denoms)}</div>
-      </div>
-      <button class="btn btn-sm btn-secondary" onclick="removeCashDeposit(${i})">✕</button>
-    </div>`).join('')||'<p style="color:var(--gray-400);font-size:13px;padding:6px 0">No deposits yet</p>';
-  const tot=shift.cashDeposits.reduce((a,d)=>a+d.total,0);
-  document.getElementById('total-deposited-display').textContent=tot.toFixed(2);
-}
-
-function formatDenomSummary(denoms){
-  return DENOMS.filter(d=>denoms[d.val]>0).map(d=>`${d.label}×${denoms[d.val]}`).join(', ');
-}
-
-function removeCashDeposit(i){
-  const shift=getActiveShift();
-  shift.cashDeposits.splice(i,1);
-  setActiveShift(shift);
-  renderSale();
-}
-
-// ==================== CASH CALCULATOR ====================
-function openCashCalc(){
-  const modal=document.getElementById('modal-cash');
-  modal.style.display='flex';
-  document.getElementById('deposit-note').value='';
-  const rows=document.getElementById('denom-rows');
-  rows.innerHTML=DENOMS.map(d=>`
-    <div class="denom-row">
-      <div class="denom-label">${d.label}</div>
-      <input type="number" min="0" step="1" value="0" id="den-${d.val}"
-        style="text-align:center"
-        oninput="recalcCash()"/>
-      <div class="denom-total" id="dent-${d.val}">₹0</div>
-    </div>`).join('');
-  recalcCash();
-}
-
-function recalcCash(){
-  let total=0;
-  DENOMS.forEach(d=>{
-    const n=parseInt(document.getElementById('den-'+d.val).value)||0;
-    const sub=n*d.val;
-    document.getElementById('dent-'+d.val).textContent='₹'+sub.toFixed(0);
-    total+=sub;
+        </div>`;
+      c.appendChild(card);
+      m.readings.forEach((_,i)=>renderReadingRow(key,i));
+      updateNozzleDayTotal(key);
+    });
   });
-  document.getElementById('calc-total').textContent=total.toFixed(2);
+  const tc=document.createElement('div'); tc.className='card'; tc.id='totCard'; tc.innerHTML=buildTotalsHTML(); c.appendChild(tc);
 }
 
-function closeCashCalc(){
-  document.getElementById('modal-cash').style.display='none';
-}
-
-function confirmCashDeposit(){
-  const shift=getActiveShift();
-  const denoms={};
-  let total=0;
-  DENOMS.forEach(d=>{
-    const n=parseInt(document.getElementById('den-'+d.val).value)||0;
-    denoms[d.val]=n;
-    total+=n*d.val;
-  });
-  if(total<=0){alert('Enter denomination amounts');return}
-  const note=document.getElementById('deposit-note').value;
-  shift.cashDeposits.push({denoms,total,note,ts:new Date().toISOString()});
-  setActiveShift(shift);
-  closeCashCalc();
-  renderSale();
-}
-
-// ==================== CLOSE SHIFT ====================
-function closeShift(){
-  const shift=getActiveShift();
-  if(!shift){alert('No active shift');return}
-  
-  // Check all nozzles have closing meters
-  const unclosed=Object.entries(shift.nozzles).filter(([n,d])=>d.closing==null);
-  if(unclosed.length>0){
-    if(!confirm(`Nozzles ${unclosed.map(([n])=>n).join(', ')} have no closing meter. Continue?`))return;
-  }
-  
-  // Calculate totals
-  const rates=shift.rates;
-  const fuel=shift.mpdFuel;
-  const ratePerL=fuel==='Petrol'?rates.petrol:fuel==='Diesel'?rates.diesel:rates.cng;
-  
-  let totalLitres=0;
-  Object.values(shift.nozzles).forEach(d=>{
-    if(d.closing!=null) totalLitres+=(d.closing-d.opening);
-  });
-  
-  const totalSaleAmt=totalLitres*ratePerL;
-  const totalCard=shift.cardPayments.reduce((a,p)=>a+p.amount,0);
-  const totalCardLtr=shift.cardPayments.reduce((a,p)=>a+p.litres,0);
-  const totalQR=shift.qrPayments.reduce((a,p)=>a+p.amount,0);
-  const totalQRLtr=shift.qrPayments.reduce((a,p)=>a+p.litres,0);
-  const cashSaleLtr=totalLitres-totalCardLtr-totalQRLtr;
-  const cashSaleAmt=cashSaleLtr*ratePerL;
-  const totalDeposited=shift.cashDeposits.reduce((a,d)=>a+d.total,0);
-  const diff=cashSaleAmt-totalDeposited;
-  
-  shift.closed=true;
-  shift.endTime=new Date().toISOString();
-  shift.summary={totalLitres,totalSaleAmt,totalCard,totalQR,totalCardLtr,totalQRLtr,cashSaleLtr,cashSaleAmt,totalDeposited,diff,ratePerL};
-  
-  // Save to log
-  const log=getShiftLog();
-  log.unshift(shift);
-  SS('shift_log',log);
-  setActiveShift(null);
-  
-  renderReconciliation(shift);
-  showScreen('recon');
-}
-
-function renderReconciliation(shift){
-  const s=shift.summary;
-  document.getElementById('recon-hdr-info').textContent=`${shift.dsmName} · ${shift.date}`;
-  const ok=Math.abs(s.diff)<0.01;
-  const short=s.diff<-0.01;
-  
-  document.getElementById('recon-content').innerHTML=`
-    <div class="card">
-      <div class="card-title">Sale Summary</div>
-      <div class="recon-row"><span class="recon-key">${shift.mpdFuel} Rate</span><span class="recon-val">₹${s.ratePerL.toFixed(2)}/L</span></div>
-      <div class="recon-row"><span class="recon-key">Total Litres Sold</span><span class="recon-val">${s.totalLitres.toFixed(3)} L</span></div>
-      <div class="recon-row"><span class="recon-key">Total Sale Amount</span><span class="recon-val">₹${s.totalSaleAmt.toFixed(2)}</span></div>
-    </div>
-    <div class="card" style="margin-top:0">
-      <div class="card-title">Payment Breakdown</div>
-      <div class="recon-row"><span class="recon-key">Card Sales</span><span class="recon-val" style="color:var(--blue)">₹${s.totalCard.toFixed(2)} (${s.totalCardLtr.toFixed(2)} L)</span></div>
-      <div class="recon-row"><span class="recon-key">QR/UPI Sales</span><span class="recon-val" style="color:var(--blue)">₹${s.totalQR.toFixed(2)} (${s.totalQRLtr.toFixed(2)} L)</span></div>
-      <div class="recon-row"><span class="recon-key">Cash Sale Litres</span><span class="recon-val">${s.cashSaleLtr.toFixed(3)} L</span></div>
-      <div class="recon-row"><span class="recon-key">Cash Sale Amount</span><span class="recon-val" style="color:var(--amber)">₹${s.cashSaleAmt.toFixed(2)}</span></div>
-    </div>
-    <div class="card" style="margin-top:0">
-      <div class="card-title">Cash Reconciliation</div>
-      <div class="recon-row"><span class="recon-key">Expected Cash</span><span class="recon-val">₹${s.cashSaleAmt.toFixed(2)}</span></div>
-      <div class="recon-row"><span class="recon-key">Deposited to ${shift.cashier}</span><span class="recon-val">₹${s.totalDeposited.toFixed(2)}</span></div>
-      <div class="match-box ${ok?'match-ok':short?'match-diff':'match-diff'}">
-        ${ok?'✓ Cash Matched!':short?`⚠ Short by ₹${Math.abs(s.diff).toFixed(2)}`:`⚠ Excess ₹${s.diff.toFixed(2)}`}
-      </div>
-    </div>
-    <div class="card" style="margin-top:0">
-      <div class="card-title">Shift Details</div>
-      <div class="recon-row"><span class="recon-key">DSM</span><span class="recon-val">${shift.dsmName}</span></div>
-      <div class="recon-row"><span class="recon-key">MPD</span><span class="recon-val">${shift.mpdName}</span></div>
-      <div class="recon-row"><span class="recon-key">Start</span><span class="recon-val">${new Date(shift.startTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span></div>
-      <div class="recon-row"><span class="recon-key">End</span><span class="recon-val">${new Date(shift.endTime).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span></div>
+function renderReadingRow(key,idx){
+  const m=S.meters[key],cont=document.getElementById('nreadings_'+key);
+  if(!cont||!m) return;
+  const fuel=m.fuel;
+  const fuelColor={ms:'#166534',hsd:'#1E3A8A',cng:'#78350F'}[fuel]||'#334155';
+  const borderCol={ms:'#86EFAC',hsd:'#93C5FD',cng:'#FCD34D'}[fuel]||'#D1D7E2';
+  const bgCol={ms:'#F0FDF4',hsd:'#EFF6FF',cng:'#FFFBEB'}[fuel]||'#fff';
+  const initOpen=m.readings[idx]?.open||'',initClose=m.readings[idx]?.close||'';
+  const openTs=m.readings[idx]?.openTs||'';
+  const closeTs=m.readings[idx]?.closeTs||'';
+  const savedEntry=S.shiftLog[idx];
+  let compareHTML='';
+  if(savedEntry){
+    const diff=savedEntry.diff||0;
+    const dc=diff===0?'zero':diff>0?'over':'short';
+    const diffLabel=diff===0?'✅ MATCH':diff>0?`⬆ OVER ₹${fmt(Math.abs(diff))}`:`⬇ SHORT ₹${fmt(Math.abs(diff))}`;
+    compareHTML=`
+    <div class="rdg-compare">
+      <div class="rdg-compare-row"><span class="rdg-cl">Gross Sales</span><span class="rdg-cv" style="color:var(--app)">₹ ${fmt(savedEntry.totalGross)}</span></div>
+      <div class="rdg-compare-row"><span class="rdg-cl">Net Cash Expected</span><span class="rdg-cv" style="color:#166534">₹ ${fmt(savedEntry.cashSales)}</span></div>
+      <div class="rdg-compare-row"><span class="rdg-cl">Cash Deposited</span><span class="rdg-cv" style="color:var(--cash)">₹ ${fmt(savedEntry.cashDeposited||0)}</span></div>
+      <div class="rdg-compare-row diff-${dc}"><span class="rdg-cl">Difference</span><span class="rdg-diff-pill ${dc}">${diffLabel}</span></div>
     </div>`;
+  }
+  const row=document.createElement('div'); row.id=`nr_${key}_${idx}`;
+  row.style.cssText=`margin-bottom:12px;padding:13px;border-radius:10px;border:2px solid ${borderCol};background:${bgCol}`;
+  row.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-family:'Exo 2',sans-serif;font-size:10px;font-weight:800;color:${fuelColor};letter-spacing:1.5px;text-transform:uppercase">
+        Reading ${idx+1}${savedEntry?` <span style="font-size:9px;color:var(--muted);font-family:Roboto,sans-serif;font-weight:400">${savedEntry.savedTime}</span>`:''}
+      </div>
+      ${idx>0&&!savedEntry?`<button onclick="removeReading('${key}',${idx})" style="background:#FFF5F5;border:1px solid #FECACA;color:#DC2626;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✕</button>`:''}
+    </div>
+    <div class="nm-inputs" style="margin-bottom:4px">
+      <div class="nmf">
+        <label>Opening Meter</label>
+        <input type="number" id="nr_${key}_${idx}_o" value="${initOpen}" placeholder="0.000" step="0.001" inputmode="decimal"
+          oninput="onReadingChange('${key}',${idx})" onfocus="stampOpenTs('${key}',${idx})"
+          ${savedEntry?'readonly style="background:#F1F5F9;color:var(--muted)"':''}>
+        <div class="meter-ts" id="ts_${key}_${idx}_o">${openTs?'🕐 '+openTs:''}</div>
+      </div>
+      <div class="nmf">
+        <label>Closing Meter</label>
+        <input type="number" id="nr_${key}_${idx}_c" value="${initClose}" placeholder="0.000" step="0.001" inputmode="decimal"
+          oninput="onReadingChange('${key}',${idx})" onblur="onClosingBlur('${key}',${idx})" onfocus="stampCloseTs('${key}',${idx})"
+          ${savedEntry?'readonly style="background:#F1F5F9;color:var(--muted)"':''}>
+        <div class="meter-ts" id="ts_${key}_${idx}_c">${closeTs?'🕐 '+closeTs:''}</div>
+      </div>
+    </div>
+    <div class="nm-results">
+      <div class="nm-res ${fuel}"><div class="rv" id="nr_${key}_${idx}_l" style="color:${fuelColor}">${initOpen||initClose?calcRowDisp(initOpen,initClose,m.rate).l:'—'}</div><div class="rl">Litres Sold</div></div>
+      <div class="nm-res ${fuel}"><div class="rv" id="nr_${key}_${idx}_a" style="color:${fuelColor}">${initOpen||initClose?calcRowDisp(initOpen,initClose,m.rate).a:'—'}</div><div class="rl">Amount ₹</div></div>
+    </div>
+    ${compareHTML}`;
+  cont.appendChild(row);
 }
 
-// ==================== SHIFT LOG ====================
-function renderLog(){
-  const log=getShiftLog();
-  const container=document.getElementById('log-content');
-  if(log.length===0){
-    container.innerHTML='<div class="card"><p style="color:var(--gray-400);text-align:center;padding:20px">No completed shifts yet</p></div>';
+function stampOpenTs(key,idx){
+  const m=S.meters[key]; if(!m||!m.readings[idx]) return;
+  if(m.readings[idx].openTs) return; // already stamped
+  const ts=nowTs();
+  m.readings[idx].openTs=ts;
+  const el=document.getElementById('ts_'+key+'_'+idx+'_o');
+  if(el) el.textContent='🕐 '+ts;
+}
+function stampCloseTs(key,idx){
+  const m=S.meters[key]; if(!m||!m.readings[idx]) return;
+  if(m.readings[idx].closeTs) return;
+  const ts=nowTs();
+  m.readings[idx].closeTs=ts;
+  const el=document.getElementById('ts_'+key+'_'+idx+'_c');
+  if(el) el.textContent='🕐 '+ts;
+}
+function nowTs(){
+  return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+}
+
+function calcRowDisp(ov,cv,rate){
+  const op=parseFloat(ov)||0,cl=parseFloat(cv)||0,s=cl-op;
+  if(!cl&&!op) return{l:'—',a:'—',err:false};
+  if(s<0) return{l:'ERROR',a:'—',err:true};
+  return{l:s.toFixed(3)+' L',a:'₹ '+fmt(s*rate),err:false};
+}
+
+function onReadingChange(key,idx){
+  const m=S.meters[key]; if(!m) return;
+  if(!m.readings[idx]) m.readings[idx]={open:'',close:'',openTs:'',closeTs:''};
+  const oEl=document.getElementById(`nr_${key}_${idx}_o`),cEl=document.getElementById(`nr_${key}_${idx}_c`);
+  m.readings[idx].open=oEl?oEl.value:''; m.readings[idx].close=cEl?cEl.value:'';
+  const d=calcRowDisp(m.readings[idx].open,m.readings[idx].close,m.rate);
+  const fc={ms:'#166534',hsd:'#1E3A8A',cng:'#78350F'}[m.fuel]||'#334155';
+  const lEl=document.getElementById(`nr_${key}_${idx}_l`),aEl=document.getElementById(`nr_${key}_${idx}_a`);
+  if(lEl){lEl.textContent=d.l;lEl.style.color=d.err?'#DC2626':fc;}
+  if(aEl){aEl.textContent=d.a;aEl.style.color=fc;}
+  updateNozzleDayTotal(key);
+  const tc=document.getElementById('totCard'); if(tc) tc.innerHTML=buildTotalsHTML();
+  document.getElementById('bdg_m').classList.add('show');
+}
+
+function onClosingBlur(key,idx){
+  const m=S.meters[key]; if(!m) return;
+  const cl=parseFloat(m.readings[idx]?.close)||0; if(!cl) return;
+  // stamp close time when value entered
+  if(!m.readings[idx].closeTs){ m.readings[idx].closeTs=nowTs(); const el=document.getElementById('ts_'+key+'_'+idx+'_c'); if(el)el.textContent='🕐 '+m.readings[idx].closeTs; }
+  if(m.readings[idx+1]!==undefined){
+    const nextO=document.getElementById(`nr_${key}_${idx+1}_o`);
+    if(nextO&&!nextO.value){ nextO.value=cl.toFixed(3); m.readings[idx+1].open=cl.toFixed(3); onReadingChange(key,idx+1); }
+  }
+}
+
+function addReading(key){
+  const m=S.meters[key]; if(!m) return;
+  if(m.readings.length>=5){ showToast('Max 5 readings per nozzle','err'); return; }
+  const lastIdx=m.readings.length-1;
+  const lastCloseEl=document.getElementById(`nr_${key}_${lastIdx}_c`);
+  if(lastCloseEl) m.readings[lastIdx].close=lastCloseEl.value;
+  const prevClose=parseFloat(m.readings[lastIdx]?.close)||0;
+  if(!prevClose){ showToast('Enter closing meter first','err'); return; }
+  m.readings.push({open:prevClose.toFixed(3), close:'', openTs:nowTs(), closeTs:''});
+  const newIdx=m.readings.length-1;
+  renderReadingRow(key,newIdx);
+  const oEl=document.getElementById(`nr_${key}_${newIdx}_o`);
+  if(oEl){ oEl.value=prevClose.toFixed(3); onReadingChange(key,newIdx); }
+  updateNozzleDayTotal(key);
+  const newRow=document.getElementById(`nr_${key}_${newIdx}`);
+  if(newRow) setTimeout(()=>newRow.scrollIntoView({behavior:'smooth',block:'center'}),100);
+}
+
+function removeReading(key,idx){
+  const m=S.meters[key]; if(!m||idx===0) return;
+  m.readings.splice(idx,1);
+  const cont=document.getElementById('nreadings_'+key); if(cont) cont.innerHTML='';
+  m.readings.forEach((_,i)=>renderReadingRow(key,i));
+  updateNozzleDayTotal(key);
+  const tc=document.getElementById('totCard'); if(tc) tc.innerHTML=buildTotalsHTML();
+}
+
+function updateNozzleDayTotal(key){
+  const m=S.meters[key]; if(!m) return;
+  let totL=0,totA=0;
+  m.readings.forEach(r=>{const op=parseFloat(r.open)||0,cl=parseFloat(r.close)||0,s=Math.max(0,cl-op);totL+=s;totA+=s*(m.rate||0);});
+  const dayDiv=document.getElementById('nday_'+key);
+  const lEl=document.getElementById('nday_'+key+'_l'),aEl=document.getElementById('nday_'+key+'_a');
+  const fc={ms:'#166534',hsd:'#1E3A8A',cng:'#78350F'}[m.fuel]||'#334155';
+  if(dayDiv){
+    if(m.readings.length>1){dayDiv.style.display='grid';if(lEl){lEl.textContent=totL>0?totL.toFixed(3)+' L':'—';lEl.style.color=fc;}if(aEl){aEl.textContent=totA>0?'₹ '+fmt(totA):'—';aEl.style.color=fc;}}
+    else dayDiv.style.display='none';
+  }
+}
+
+function buildTotalsHTML(){
+  const bf={ms:{l:0,a:0},hsd:{l:0,a:0},cng:{l:0,a:0}};let gl=0,ga=0;
+  Object.keys(S.meters).forEach(k=>{const m=S.meters[k];m.readings.forEach(r=>{const op=parseFloat(r.open)||0,cl=parseFloat(r.close)||0,s=Math.max(0,cl-op),a=s*(m.rate||0);bf[m.fuel].l+=s;bf[m.fuel].a+=a;gl+=s;ga+=a;});});
+  const fc={ms:'#166534',hsd:'#1E3A8A',cng:'#78350F'}; let rows='';
+  ['ms','hsd','cng'].forEach(f=>{if(bf[f].l>0) rows+=`<div class="rrow"><span class="rl" style="color:${fc[f]}">${f.toUpperCase()} Total</span><span class="rv" style="color:${fc[f]}">${bf[f].l.toFixed(3)} L · ₹${fmt(bf[f].a)}</span></div>`;});
+  return `<div class="ch grn">📊 Running Totals</div><div class="cb">${rows}
+    <div class="rrow"><span class="rl" style="font-size:14px;font-weight:800;color:var(--app)">GRAND TOTAL</span>
+    <span class="rv" style="color:var(--app);font-size:15px">${gl.toFixed(3)} L · ₹${fmt(ga)}</span></div></div>`;
+}
+
+function getGrandTotals(){
+  let gl=0,ga=0;const bf={ms:{l:0,a:0},hsd:{l:0,a:0},cng:{l:0,a:0}};const byN=[];
+  Object.keys(S.meters).forEach(k=>{
+    const m=S.meters[k];
+    const lastIdx=m.readings.length-1;
+    const r=m.readings[lastIdx];
+    const op=parseFloat(r?.open)||0,cl=parseFloat(r?.close)||0;
+    const s=Math.max(0,cl-op),a=s*(m.rate||0);
+    gl+=s;ga+=a;bf[m.fuel].l+=s;bf[m.fuel].a+=a;
+    byN.push({key:k,mpd:m.mpd,nozzle:m.nozzle,fuel:m.fuel,rate:m.rate,open:op,close:cl,sales:s,amt:a,readings:m.readings});
+  });
+  return{ltr:gl,amt:ga,byFuel:bf,byNozzle:byN};
+}
+
+/* PAYMENTS */
+function addExtraQR(){
+  eqrN++;const id=eqrN;
+  const d=document.createElement('div');d.className='qr-row';d.id='eqr_'+id;
+  d.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div class="qr-lbl">QR/UPI #${id+2}</div><button class="rm-btn" onclick="rmEl('eqr_${id}');calcPay()">✕</button></div>
+    <div class="field"><label>Name</label><input type="text" id="eqr_${id}_n" placeholder="UPI or name"></div>
+    <div class="field"><label>Amount ₹</label><input type="number" id="eqr_${id}_a" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>`;
+  document.getElementById('extraQR').appendChild(d);
+}
+
+function addCredit(){
+  crN++;const id=crN;
+  const d=document.createElement('div');d.className='cr-row';d.id='cred_'+id;
+  d.innerHTML=`<div class="cr-lbl"><span>Credit Party #${id}</span>${id>1?`<button class="rm-btn" onclick="rmEl('cred_${id}');calcPay()">✕</button>`:''}</div>
+    <div class="field"><label>Party Name</label><input type="text" id="cr_${id}_n" placeholder="Customer / Company"></div>
+    <div class="row3">
+      <div class="field"><label>Litres</label><input type="number" id="cr_${id}_l" placeholder="0.000" step="0.001" inputmode="decimal" oninput="calcPay()"></div>
+      <div class="field"><label>Rate ₹/L</label><input type="number" id="cr_${id}_r" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>
+      <div class="field"><label>Amt ₹</label><input type="number" id="cr_${id}_a" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>
+    </div>
+    <div style="text-align:right;font-family:'Roboto',sans-serif;font-size:13px;color:#B91C1C" id="cr_${id}_t">₹ 0.00</div>`;
+  document.getElementById('creditList').appendChild(d);
+}
+
+function calcPay(){
+  let qr=0;
+  qr+=parseFloat(document.getElementById('ufill_a').value)||0;
+  qr+=parseFloat(document.getElementById('ppe_a').value)||0;
+  for(let i=1;i<=eqrN;i++){const e=document.getElementById('eqr_'+i+'_a');if(e)qr+=parseFloat(e.value)||0;}
+  let cr=0;
+  for(let i=1;i<=crN;i++){
+    const n=document.getElementById('cr_'+i+'_n');if(!n)continue;
+    const l=parseFloat(document.getElementById('cr_'+i+'_l').value)||0;
+    const r=parseFloat(document.getElementById('cr_'+i+'_r').value)||0;
+    const a=parseFloat(document.getElementById('cr_'+i+'_a').value)||0;
+    const amt=a>0?a:(l*r);
+    const te=document.getElementById('cr_'+i+'_t');if(te)te.textContent='₹ '+fmt(amt);cr+=amt;
+  }
+  let oil=0;
+  for(let i=1;i<=oilN;i++){
+    const ae=document.getElementById('oil_'+i+'_a');
+    const amt=parseFloat(ae?.value)||0;
+    const te=document.getElementById('oil_'+i+'_t');if(te)te.textContent='₹ '+fmt(amt);
+    oil+=amt;
+  }
+  document.getElementById('tot_qr').textContent='₹ '+fmt(qr);
+  document.getElementById('tot_cr').textContent='₹ '+fmt(cr);
+  const oilEl=document.getElementById('tot_oil');if(oilEl)oilEl.textContent='₹ '+fmt(oil);
+  document.getElementById('tot_ded').textContent='₹ '+fmt(qr+cr);
+  document.getElementById('bdg_p').classList.toggle('show',qr>0||cr>0);
+}
+
+function getQRTot(){let t=0;t+=parseFloat(document.getElementById('ufill_a').value)||0;t+=parseFloat(document.getElementById('ppe_a').value)||0;for(let i=1;i<=eqrN;i++){const e=document.getElementById('eqr_'+i+'_a');if(e)t+=parseFloat(e.value)||0;}return t;}
+function getCrTot(){let t=0;for(let i=1;i<=crN;i++){const n=document.getElementById('cr_'+i+'_n');if(!n)continue;const l=parseFloat(document.getElementById('cr_'+i+'_l').value)||0;const r=parseFloat(document.getElementById('cr_'+i+'_r').value)||0;const a=parseFloat(document.getElementById('cr_'+i+'_a').value)||0;t+=a>0?a:l*r;}return t;}
+function getOilTot(){let t=0;for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i+'_a');if(el)t+=parseFloat(el.value)||0;}return t;}
+function getQRData(){const a=[];a.push({name:'UFILL',amt:parseFloat(document.getElementById('ufill_a').value)||0});a.push({name:'PhonePe',amt:parseFloat(document.getElementById('ppe_a').value)||0});for(let i=1;i<=eqrN;i++){const n=document.getElementById('eqr_'+i+'_n');const am=document.getElementById('eqr_'+i+'_a');if(!n)continue;a.push({name:n.value||'QR '+i,amt:parseFloat(am?.value)||0});}return a.filter(x=>x.amt>0);}
+function getCrData(){const a=[];for(let i=1;i<=crN;i++){const n=document.getElementById('cr_'+i+'_n');if(!n)continue;const l=parseFloat(document.getElementById('cr_'+i+'_l').value)||0;const r=parseFloat(document.getElementById('cr_'+i+'_r').value)||0;const am=parseFloat(document.getElementById('cr_'+i+'_a').value)||0;const amt=am>0?am:l*r;if(amt>0||n.value)a.push({name:n.value||'Party '+i,ltr:l,rate:r,amt});}return a;}
+function getOilData(){const a=[];for(let i=1;i<=oilN;i++){const n=document.getElementById('oil_'+i+'_n');const q=document.getElementById('oil_'+i+'_q');const am=document.getElementById('oil_'+i+'_a');if(!n)continue;const amt=parseFloat(am?.value)||0;if(amt>0||n.value)a.push({name:n.value||'Oil '+i,qty:parseFloat(q?.value)||0,amt});}return a;}
+
+/* OIL SALES */
+function addOilRow(prefillName){
+  oilN++;
+  const id=oilN;
+  const opts=OIL_ITEMS.map(n=>`<option value="${n}" ${n===prefillName?'selected':''}>${n}</option>`).join('');
+  const d=document.createElement('div');
+  d.className='oil-row'; d.id='oil_'+id;
+  d.innerHTML=`<div class="oil-row-top">
+    <div class="oil-lbl">🛢️ Oil Item ${id}</div>
+    <button class="rm-btn" onclick="rmEl('oil_${id}');calcPay()">✕</button>
+  </div>
+  <div class="field" style="margin-bottom:8px">
+    <label>Item</label>
+    <select id="oil_${id}_n" onchange="calcPay()" style="width:100%;background:#fff;border:1.5px solid #FED7AA;color:#1E293B;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:600;padding:10px 12px;border-radius:9px;outline:none">
+      <option value="">— Select Oil Item —</option>${opts}<option value="__new__">➕ Add New Item…</option>
+    </select>
+  </div>
+  <div class="oil-fields">
+    <div class="field"><label>Qty</label><input type="number" id="oil_${id}_q" placeholder="0" step="1" inputmode="decimal" oninput="calcPay()"></div>
+    <div class="field"><label>Amount ₹</label><input type="number" id="oil_${id}_a" placeholder="0.00" step="0.01" inputmode="decimal" oninput="calcPay()"></div>
+  </div>
+  <div class="oil-total" id="oil_${id}_t">₹ 0.00</div>`;
+  document.getElementById('oilList').appendChild(d);
+  document.getElementById('oil_'+id+'_n').addEventListener('change',function(){
+    if(this.value==='__new__'){
+      const name=prompt('Enter new oil item name:');
+      if(name&&name.trim()){const n=name.trim().toUpperCase();OIL_ITEMS.push(n);OIL_ITEMS.sort();document.querySelectorAll('[id^="oil_"][id$="_n"]').forEach(sel=>{const before=sel.querySelector('option[value="__new__"]');const opt=document.createElement('option');opt.value=n;opt.textContent=n;sel.insertBefore(opt,before);});this.value=n;}
+      else this.value='';
+      calcPay();
+    }
+  });
+  calcPay();
+}
+
+/* ═══════════ CASH DEPOSITS ═══════════ */
+function buildDenomRows(){
+  const cont=document.getElementById('denomRows');
+  DENOMS.forEach(d=>{
+    const row=document.createElement('div');row.className='denom-row';
+    row.innerHTML=`<div class="denom-note">₹ ${d}</div>
+      <div class="denom-cnt-cell"><input class="denom-cnt" type="number" id="dn_${d}" placeholder="0" min="0" step="1" inputmode="numeric" oninput="calcCash()"></div>
+      <div class="denom-rtot" id="dt_${d}">—</div>`;
+    cont.appendChild(row);
+  });
+  // Add coins row
+  const cr=document.createElement('div');cr.className='denom-row';
+  cr.innerHTML=`<div class="denom-note" style="color:#D97706">🪙 Coins</div>
+    <div class="denom-cnt-cell"><input class="denom-cnt coins-input" type="number" id="dn_coins" placeholder="0.00" step="0.50" inputmode="decimal" oninput="calcCash()" style="width:90px"></div>
+    <div class="denom-rtot" id="dt_coins">—</div>`;
+  cont.appendChild(cr);
+}
+
+function calcCash(){
+  let t=0;
+  DENOMS.forEach(d=>{const cnt=parseInt(document.getElementById('dn_'+d).value)||0;const amt=cnt*d;const el=document.getElementById('dt_'+d);if(el)el.textContent=cnt>0?'₹ '+amt.toLocaleString('en-IN'):'—';t+=amt;});
+  const coins=parseFloat(document.getElementById('dn_coins').value)||0;
+  const cEl=document.getElementById('dt_coins'); if(cEl)cEl.textContent=coins>0?'₹ '+coins.toFixed(2):'—';
+  t+=coins;
+  document.getElementById('cashTotDisp').textContent='₹ '+fmt(t);
+  document.getElementById('bdg_c').classList.toggle('show',t>0);
+}
+
+function getCashTot(){
+  let t=0;
+  DENOMS.forEach(d=>{t+=(parseInt(document.getElementById('dn_'+d).value)||0)*d;});
+  t+=parseFloat(document.getElementById('dn_coins').value)||0;
+  return t;
+}
+
+function getDenomData(){
+  const d={};
+  DENOMS.forEach(v=>{d[v]=parseInt(document.getElementById('dn_'+v).value)||0;});
+  d.coins=parseFloat(document.getElementById('dn_coins').value)||0;
+  return d;
+}
+
+function clearDenomInputs(){
+  DENOMS.forEach(d=>{const el=document.getElementById('dn_'+d);if(el)el.value='';const dt=document.getElementById('dt_'+d);if(dt)dt.textContent='—';});
+  const c=document.getElementById('dn_coins');if(c)c.value='';
+  const dc=document.getElementById('dt_coins');if(dc)dc.textContent='—';
+  document.getElementById('cashTotDisp').textContent='₹ 0.00';
+  document.getElementById('bdg_c').classList.remove('show');
+}
+
+/* SAVE CASH DEPOSIT — called each time DSM deposits cash */
+function saveCashDeposit(){
+  const total=getCashTot();
+  if(total<=0){showToast('Enter denomination amounts','err');return;}
+  const now=new Date();
+  const ts=now.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+  const dep={total,denoms:getDenomData(),ts,date:now.toISOString().split('T')[0]};
+  S.cashDeposits.push(dep);
+  localStorage.setItem('fdp_cash_deps',JSON.stringify(S.cashDeposits));
+  clearDenomInputs();
+  renderCashDepositLog();
+  showToast('💰 ₹'+fmt(total)+' deposited at '+ts);
+}
+
+function renderCashDepositLog(){
+  const cont=document.getElementById('cashDepositLog');
+  const totEl=document.getElementById('cashSavedTotalRow');
+  const totAmt=document.getElementById('cashSavedTotalAmt');
+  if(!S.cashDeposits.length){
+    cont.innerHTML='<p style="text-align:center;color:var(--muted);font-size:13px;padding:10px 0">No deposits saved yet</p>';
+    if(totEl)totEl.style.display='none';
     return;
   }
-  container.innerHTML=log.map((s,i)=>{
-    const sm=s.summary||{};
-    return `<div class="card" style="cursor:pointer" onclick="expandLog(${i})">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:600;font-size:15px">${s.dsmName}</div>
-          <div class="ts">${s.date} · ${s.mpdName}</div>
+  const grandTotal=S.cashDeposits.reduce((s,d)=>s+d.total,0);
+  cont.innerHTML=S.cashDeposits.map((dep,i)=>{
+    const denomStr=DENOMS.filter(d=>dep.denoms[d]>0).map(d=>`₹${d}×${dep.denoms[d]}`).join(' · ')+(dep.denoms.coins>0?' · Coins ₹'+dep.denoms.coins:'');
+    return `<div class="cash-dep-item">
+      <div style="flex:1">
+        <div class="cash-dep-amount">₹ ${fmt(dep.total)}</div>
+        <div class="cash-dep-ts">🕐 ${dep.ts}</div>
+        ${denomStr?`<div class="cash-dep-denoms">${denomStr}</div>`:''}
+      </div>
+      <button class="cash-dep-del" onclick="deleteCashDeposit(${i})">✕</button>
+    </div>`;
+  }).join('');
+  if(totEl){totEl.style.display='flex';}
+  if(totAmt)totAmt.textContent='₹ '+fmt(grandTotal);
+}
+
+function deleteCashDeposit(i){
+  S.cashDeposits.splice(i,1);
+  localStorage.setItem('fdp_cash_deps',JSON.stringify(S.cashDeposits));
+  renderCashDepositLog();
+}
+
+function getTotalCashDeposited(){
+  return S.cashDeposits.reduce((s,d)=>s+d.total,0);
+}
+
+/* CLOSE SHIFT — verify total cash vs sales */
+function closeShiftFinal(){
+  if(!S.dsm){showToast('Select a DSM first','err');showTab('setup');return;}
+  const{ltr:tl,amt:tg,byFuel:bf,byNozzle:byN}=getGrandTotals();
+  if(tl<=0){showToast('Enter meter readings first','err');showTab('meters');return;}
+  if(!S.cashDeposits.length){
+    if(!confirm('No cash deposits saved. Close shift anyway?'))return;
+  }
+  const qrt=getQRTot(),crt=getCrTot(),oilt=getOilTot();
+  const cashExpected=tg-qrt-crt+oilt;
+  const cashDeposited=getTotalCashDeposited();
+  const diff=cashDeposited-cashExpected;
+  const now=new Date();
+  const savedTime=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const rec={
+    id:Date.now(),
+    entryNum:S.shiftLog.length+1,
+    date:document.getElementById('saleDate').value,
+    savedTime,
+    dsm:S.dsm, mpds:S.selMPDs, nozzleData:byN, qrData:getQRData(), creditData:getCrData(), oilData:getOilData(),
+    denomData:S.cashDeposits,
+    rates:{...S.rates}, byFuel:bf,
+    totalLtr:tl, totalGross:tg, qrTotal:qrt, creditTotal:crt, oilTotal:oilt,
+    cashSales:cashExpected, cashDeposited:cashDeposited, cashInHand:cashDeposited, diff
+  };
+  S.shiftLog.push(rec);
+  localStorage.setItem('fdp_shift',JSON.stringify(S.shiftLog));
+  document.getElementById('bdg_sh').textContent=S.shiftLog.length;
+  document.getElementById('bdg_sh').classList.add('show');
+
+  // Archive to allShifts
+  const archive={dsm:S.dsm,date:rec.date,closedAt:savedTime,entries:S.shiftLog,cashDeposits:S.cashDeposits};
+  S.allShifts.unshift(archive);
+  localStorage.setItem('fdp_allshifts',JSON.stringify(S.allShifts));
+
+  // Save to 7-day DSM log
+  saveToDSMLog(rec);
+
+  renderShiftLog();
+  showToast('🏁 Shift closed!');
+
+  // Sync to cloud
+  if(window._saveToCloud) window._saveToCloud(rec).catch(()=>{});
+
+  // Show close summary inline
+  showCloseResult(rec);
+  carryForwardAndReset();
+}
+
+function showCloseResult(rec){
+  const diff=rec.diff;
+  const dc=diff===0?'zero':diff>0?'over':'short';
+  const dl=diff===0?'✅ EXACT MATCH':diff>0?'⬆️ CASH OVER':'⬇️ CASH SHORT';
+  const panel=document.createElement('div');
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
+  panel.innerHTML=`<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
+    <div style="font-family:'Orbitron',monospace;font-size:13px;color:var(--app);letter-spacing:1px;margin-bottom:16px;text-align:center">🏁 SHIFT CLOSED</div>
+    <div class="big-diff ${dc}"><div class="bd-lbl">${dl}</div><div class="bd-val">₹${fmt(Math.abs(diff))}</div>
+      <div class="bd-sub">Expected ₹${fmt(rec.cashSales)} · Deposited ₹${fmt(rec.cashDeposited)}</div></div>
+    <div class="stat3">
+      <div class="stat-b"><div class="sv" style="color:var(--app)">₹${fmt(rec.totalGross)}</div><div class="sl">Gross</div></div>
+      <div class="stat-b"><div class="sv" style="color:#166534">₹${fmt(rec.cashSales)}</div><div class="sl">Net Cash</div></div>
+      <div class="stat-b"><div class="sv" style="color:var(--cash)">₹${fmt(rec.cashDeposited)}</div><div class="sl">Deposited</div></div>
+    </div>
+    <div class="rrow"><span class="rl">Total Litres</span><span class="rv">${rec.totalLtr.toFixed(3)} L</span></div>
+    <div class="rrow"><span class="rl">QR / UPI Deducted</span><span class="rv" style="color:#6D28D9">₹ ${fmt(rec.qrTotal)}</span></div>
+    <div class="rrow"><span class="rl">Credits Deducted</span><span class="rv" style="color:#B91C1C">₹ ${fmt(rec.creditTotal)}</span></div>
+    <div class="rrow"><span class="rl">Cash Deposits (${S.cashDeposits.length})</span><span class="rv" style="color:var(--cash)">₹ ${fmt(rec.cashDeposited)}</span></div>
+    <button onclick="this.closest('[style*=position]').remove()" style="width:100%;margin-top:16px;background:linear-gradient(135deg,#1E6B8E,#155E75);color:#fff;border:none;padding:14px;border-radius:10px;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;cursor:pointer">✓ DONE</button>
+  </div>`;
+  document.body.appendChild(panel);
+}
+
+function carryForwardAndReset(){
+  buildMetersPage();
+  const ufill=document.getElementById('ufill_a'), ppe=document.getElementById('ppe_a');
+  if(ufill)ufill.value=''; if(ppe)ppe.value='';
+  for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
+  for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
+  addCredit();
+  for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i);if(el)el.remove();} oilN=0;
+  S.cashDeposits=[];
+  localStorage.removeItem('fdp_cash_deps');
+  renderCashDepositLog();
+  calcPay();
+  showTab('meters');
+}
+
+function resetMeters(){
+  if(!confirm('Reset all meter readings? This clears readings but keeps shift log.')) return;
+  Object.keys(S.meters).forEach(k=>{ S.meters[k].readings=[{open:'',close:'',openTs:'',closeTs:''}]; });
+  buildMetersPage();
+  showToast('🔄 Meters reset');
+}
+
+/* DASHBOARD */
+function refreshDashboard(){
+  const cont=document.getElementById('dashCont');
+  if(!S.shiftLog.length){
+    cont.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:40px;margin-bottom:10px">📈</div><div style="font-weight:700">No entries saved yet</div></div>';
+    return;
+  }
+  const entryCards=S.shiftLog.map((r,i)=>{
+    const diff=r.diff||0;
+    const dc=diff===0?'#166534':diff>0?'#1E3A8A':'#DC2626';
+    const dbg=diff===0?'#DCFCE7':diff>0?'#DBEAFE':'#FEE2E2';
+    const dl=diff===0?'✅ Match':diff>0?`⬆ Over ₹${fmt(Math.abs(diff))}`:`⬇ Short ₹${fmt(Math.abs(diff))}`;
+    return `<div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="background:#F0F9FF;padding:9px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:var(--app)">ENTRY ${i+1}</div>
+        <div style="font-family:'Roboto',sans-serif;font-size:10px;color:var(--muted)">${r.savedTime||''}</div>
+      </div>
+      <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#F8FAFC;border-radius:8px;padding:9px 10px"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Sales</div><div style="font-family:'Roboto',sans-serif;font-size:15px;font-weight:900;color:var(--app)">₹${fmt(r.totalGross)}</div></div>
+        <div style="background:#F8FAFC;border-radius:8px;padding:9px 10px"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">QR / UPI</div><div style="font-family:'Roboto',sans-serif;font-size:15px;font-weight:900;color:#6D28D9">₹${fmt(r.qrTotal)}</div></div>
+        <div style="background:#F8FAFC;border-radius:8px;padding:9px 10px"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Expected Cash</div><div style="font-family:'Roboto',sans-serif;font-size:15px;font-weight:900;color:#166534">₹${fmt(r.cashSales)}</div></div>
+        <div style="background:#F8FAFC;border-radius:8px;padding:9px 10px"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Cash Deposited</div><div style="font-family:'Roboto',sans-serif;font-size:15px;font-weight:900;color:var(--cash)">₹${fmt(r.cashDeposited||0)}</div></div>
+      </div>
+      <div style="margin:0 14px 12px;background:${dbg};border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;font-weight:700;color:${dc}">Difference</span>
+        <span style="font-family:'Roboto',sans-serif;font-size:13px;font-weight:900;color:${dc}">${dl}</span>
+      </div>
+    </div>`;
+  }).join('');
+  const totGross=S.shiftLog.reduce((s,r)=>s+(r.totalGross||0),0);
+  const totQR=S.shiftLog.reduce((s,r)=>s+(r.qrTotal||0),0);
+  const totNet=S.shiftLog.reduce((s,r)=>s+(r.cashSales||0),0);
+  const totCash=S.shiftLog.reduce((s,r)=>s+(r.cashDeposited||0),0);
+  const totDiff=totCash-totNet;
+  const tdc=totDiff===0?'#166534':totDiff>0?'#1E3A8A':'#DC2626';
+  const tdl=totDiff===0?'✅ BALANCED':totDiff>0?'⬆ CASH OVER':'⬇ CASH SHORT';
+  const totalCard=`<div style="background:linear-gradient(135deg,#1E3A5F,#1E6B8E);border-radius:14px;padding:18px;margin-bottom:12px;color:#fff">
+    <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;margin-bottom:14px;opacity:.8">📊 SHIFT TOTAL — ${S.shiftLog.length} ENTRIES</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900">₹${fmt(totGross)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total Sales</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#a78bfa">₹${fmt(totQR)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total QR / UPI</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#86efac">₹${fmt(totNet)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Net Cash Expected</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#fcd34d">₹${fmt(totCash)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total Cash Deposited</div></div>
+    </div>
+    <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,.2)">
+      <div style="font-family:'Roboto',sans-serif;font-size:30px;font-weight:900;color:${tdc==='#166534'?'#86EFAC':tdc==='#1E3A8A'?'#93C5FD':'#FCA5A5'}">${totDiff>=0?'+':''}₹${fmt(Math.abs(totDiff))}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:4px;font-family:'Roboto',sans-serif">${tdl}</div>
+    </div>
+  </div>`;
+  cont.innerHTML=`<div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--app);letter-spacing:1.5px;margin-bottom:10px">ENTRY-WISE VIEW</div>`+entryCards+totalCard;
+}
+
+/* ── SHIFT LOG ── */
+function buildShiftBlock(entries){
+  const totGross=entries.reduce((s,r)=>s+(r.totalGross||0),0);
+  const totQR=entries.reduce((s,r)=>s+(r.qrTotal||0),0);
+  const totNet=entries.reduce((s,r)=>s+(r.cashSales||0),0);
+  const totCash=entries.reduce((s,r)=>s+(r.cashDeposited||0),0);
+  const totDiff=totCash-totNet;
+  const diffColor=totDiff===0?'#86EFAC':totDiff>0?'#93C5FD':'#FCA5A5';
+  const diffLabel=totDiff===0?'✅ BALANCED':totDiff>0?'⬆ CASH OVER':'⬇ CASH SHORT';
+  const entryRows=entries.map((r,i)=>{
+    const diff=r.diff||0;
+    const diffC=diff===0?'#166534':diff>0?'#1E3A8A':'#DC2626';
+    const diffL=diff===0?'✅ Match':diff>0?`⬆ Over ₹${fmt(Math.abs(diff))}`:`⬇ Short ₹${fmt(Math.abs(diff))}`;
+    const deposits=Array.isArray(r.denomData)?r.denomData:[];
+    const depHtml=deposits.map(d=>`<div style="font-size:11px;color:var(--muted);padding:3px 0">🕐 ${d.ts} — ₹${fmt(d.total)}</div>`).join('');
+    return `<div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F0F9FF;border-bottom:1px solid var(--border)">
+        <div style="font-family:'Orbitron',monospace;font-size:12px;font-weight:900;color:var(--app)">ENTRY ${i+1}</div>
+        <div style="font-family:'Roboto',sans-serif;font-size:11px;color:var(--muted)">${r.savedTime||''}</div>
+      </div>
+      <div style="padding:10px 14px">
+        <div class="se-row"><span class="se-lbl">Sales Amount</span><span class="se-val" style="color:var(--app)">₹ ${fmt(r.totalGross)}</span></div>
+        <div class="se-row"><span class="se-lbl">QR / UPI</span><span class="se-val" style="color:#6D28D9">₹ ${fmt(r.qrTotal)}</span></div>
+        <div class="se-row"><span class="se-lbl">Net Cash Expected</span><span class="se-val" style="color:#166534">₹ ${fmt(r.cashSales)}</span></div>
+        <div class="se-row"><span class="se-lbl">Cash Deposited</span><span class="se-val" style="color:var(--cash)">₹ ${fmt(r.cashDeposited||0)}</span></div>
+        ${depHtml?`<div style="background:#FFFBEB;border-radius:7px;padding:8px 10px;margin-top:6px;border:1px solid var(--cash-bd)">${depHtml}</div>`:''}
+        <div class="se-row" style="margin-top:6px"><span class="se-lbl">Difference</span>
+          <span style="font-family:'Roboto',sans-serif;font-size:12px;font-weight:800;color:${diffC};background:${diff===0?'#DCFCE7':diff>0?'#DBEAFE':'#FEE2E2'};padding:3px 10px;border-radius:20px">${diffL}</span>
         </div>
-        <span class="badge ${sm.diff!=null&&Math.abs(sm.diff)<0.01?'badge-green':'badge-amber'}">${sm.diff!=null&&Math.abs(sm.diff)<0.01?'Matched':'Review'}</span>
       </div>
-      <div style="margin-top:10px;display:flex;gap:12px;font-size:13px">
-        <span><strong>${sm.totalLitres!=null?sm.totalLitres.toFixed(1):'—'}</strong> L</span>
-        <span>₹<strong>${sm.totalSaleAmt!=null?sm.totalSaleAmt.toFixed(0):'—'}</strong> sale</span>
-        <span style="color:var(--green)">₹<strong>${sm.totalDeposited!=null?sm.totalDeposited.toFixed(0):'—'}</strong> cash</span>
+    </div>`;
+  }).join('');
+  const totalCard=`<div style="background:linear-gradient(135deg,#1E3A5F,#1E6B8E);border-radius:14px;padding:18px 16px;margin-bottom:12px;color:#fff">
+    <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;margin-bottom:14px;opacity:.8">🏁 SHIFT TOTAL — ${entries.length} ENTR${entries.length>1?'IES':'Y'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px 12px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900">₹${fmt(totGross)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total Sales</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px 12px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#a78bfa">₹${fmt(totQR)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total QR / UPI</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px 12px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#86efac">₹${fmt(totNet)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Net Cash Expected</div></div>
+      <div style="background:rgba(255,255,255,.12);border-radius:9px;padding:10px 12px"><div style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#fcd34d">₹${fmt(totCash)}</div><div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Cash Deposited</div></div>
+    </div>
+    <div style="border-radius:10px;padding:14px;text-align:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2)">
+      <div style="font-family:'Roboto',sans-serif;font-size:32px;font-weight:900;color:${diffColor}">${totDiff>=0?'+':''}₹${fmt(Math.abs(totDiff))}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:4px;font-family:'Roboto',sans-serif">${diffLabel}</div>
+    </div>
+  </div>`;
+  return{entryRows,totalCard};
+}
+
+function renderShiftLog(){
+  const cont=document.getElementById('shiftCont');
+  let html='';
+  if(S.shiftLog.length){
+    const{entryRows,totalCard}=buildShiftBlock(S.shiftLog);
+    const dsmLabel=S.shiftLog[0]?.dsm||S.dsm||'';
+    const dateLabel=S.shiftLog[0]?.date||'';
+    const ds=dateLabel?new Date(dateLabel).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
+    html+=`<div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--app);letter-spacing:1.5px;margin-bottom:10px">👤 ${dsmLabel}${ds?' · '+ds:''} — CURRENT SHIFT</div>`;
+    html+=entryRows+totalCard;
+    html+=`<button onclick="resetShift()" style="width:100%;margin-top:4px;background:#F1F5F9;border:1px solid var(--border);color:var(--muted);padding:13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">🔄 Start New Shift / New DSM</button>`;
+  } else {
+    html=`<div style="text-align:center;padding:30px 20px;color:var(--muted);background:#F8FAFC;border-radius:12px">
+      <div style="font-size:40px;margin-bottom:10px">📋</div>
+      <div style="font-weight:700">No active shift</div>
+      <div style="font-size:12px;margin-top:6px">Close a shift to see entries here</div>
+    </div>`;
+  }
+  if(S.allShifts.length){
+    html+=`<div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;margin:18px 0 10px">PAST SHIFTS</div>`;
+    S.allShifts.forEach((shift,si)=>{
+      const ds=shift.date?new Date(shift.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
+      const totG=shift.entries.reduce((s,r)=>s+(r.totalGross||0),0);
+      const totC=shift.entries.reduce((s,r)=>s+(r.cashDeposited||0),0);
+      const totN=shift.entries.reduce((s,r)=>s+(r.cashSales||0),0);
+      const d=totC-totN; const dc=d===0?'#166534':d>0?'#1E3A8A':'#DC2626'; const dbg=d===0?'#DCFCE7':d>0?'#DBEAFE':'#FEE2E2';
+      html+=`<div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <div onclick="togglePastShift(${si})" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:#FAFAFA">
+          <div><div style="font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:var(--app)">👤 ${shift.dsm}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">${ds} · ${shift.entries.length} entr${shift.entries.length>1?'ies':'y'} · ₹${fmt(totG)}</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'Roboto',sans-serif;font-size:11px;font-weight:800;color:${dc};background:${dbg};padding:3px 10px;border-radius:20px">${d===0?'✅':d>0?'⬆':'⬇'} ₹${fmt(Math.abs(d))}</span>
+            <span id="pastArrow_${si}" style="color:var(--muted);font-size:14px">▼</span>
+          </div>
+        </div>
+        <div id="pastShift_${si}" style="display:none;padding:12px 14px;border-top:1px solid var(--border)">
+          ${buildShiftBlock(shift.entries).entryRows}
+          ${buildShiftBlock(shift.entries).totalCard}
+        </div>
+      </div>`;
+    });
+  }
+  cont.innerHTML=html||`<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">📋</div><div style="font-weight:700">No entries yet</div></div>`;
+}
+
+function togglePastShift(idx){
+  const el=document.getElementById('pastShift_'+idx);
+  const arrow=document.getElementById('pastArrow_'+idx);
+  if(!el) return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(arrow)arrow.textContent=open?'▲':'▼';
+}
+
+function resetShift(){
+  if(!confirm('Start new shift for next DSM? This clears all entries, meters, QR and cash. Saved records are kept.')) return;
+  S.shiftLog=[]; S.cashDeposits=[];
+  localStorage.removeItem('fdp_shift'); localStorage.removeItem('fdp_cash_deps');
+  S.meters={}; S.dsm=''; S.selMPDs=[]; S.selNozzles=[];
+  document.getElementById('dsmSel').value='';
+  document.querySelectorAll('.mpd-card').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('ufill_a').value=''; document.getElementById('ppe_a').value='';
+  for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
+  for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
+  addCredit();
+  clearDenomInputs(); renderCashDepositLog();
+  calcPay();
+  const mc=document.getElementById('metersCont'); if(mc)mc.innerHTML='';
+  document.getElementById('bdg_sh').textContent=''; document.getElementById('bdg_sh').classList.remove('show');
+  document.getElementById('bdg_m').classList.remove('show');
+  renderShiftLog(); showTab('setup'); showToast('Ready for next DSM');
+}
+
+/* ═══════════ 7-DAY DSM LOG ═══════════ */
+function saveToDSMLog(rec){
+  const log=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  log.unshift({...rec, loggedAt:new Date().toISOString()});
+  localStorage.setItem('fdp_dsmlog',JSON.stringify(log));
+}
+
+function purgeOldDSMLog(){
+  const log=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  const cutoff=Date.now()-(7*24*60*60*1000);
+  const pruned=log.filter(r=>new Date(r.loggedAt).getTime()>cutoff);
+  if(pruned.length!==log.length) localStorage.setItem('fdp_dsmlog',JSON.stringify(pruned));
+}
+
+function renderDSMLog(){
+  purgeOldDSMLog();
+  const log=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  const cont=document.getElementById('dsmLogCont');
+  if(!log.length){
+    cont.innerHTML=`<div style="text-align:center;padding:50px 20px;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">📅</div><div style="font-weight:700">No logs yet</div><div style="font-size:12px;margin-top:6px">Closed shifts appear here for 7 days</div></div>`;
+    return;
+  }
+  // Group by date
+  const byDate={};
+  log.forEach(r=>{
+    const d=r.date||'Unknown';
+    if(!byDate[d]) byDate[d]=[];
+    byDate[d].push(r);
+  });
+  cont.innerHTML=Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).map((date,di)=>{
+    const entries=byDate[date];
+    const ds=date!=='Unknown'?new Date(date).toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}):date;
+    const expiry=entries[0]?.loggedAt?new Date(new Date(entries[0].loggedAt).getTime()+7*24*60*60*1000).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'';
+    const entriesHtml=entries.map((r,i)=>{
+      const diff=r.diff||0;
+      const dc=diff===0?'match':diff>0?'over':'short';
+      const dl=diff===0?'✅ Match':diff>0?`⬆ Over ₹${fmt(Math.abs(diff))}`:`⬇ Short ₹${fmt(Math.abs(diff))}`;
+      const deposits=Array.isArray(r.denomData)?r.denomData:[];
+      const depHtml=deposits.map(d=>`<div class="log-val-row"><span class="log-val-lbl">🕐 ${d.ts}</span><span class="log-val-v" style="color:var(--cash)">₹ ${fmt(d.total)}</span></div>`).join('');
+      return `<div class="log-entry">
+        <div class="log-entry-hdr">
+          <div>
+            <div class="log-entry-num">👤 ${r.dsm} — SHIFT CLOSE</div>
+            <div class="log-entry-time">🕐 ${r.savedTime||''} · ${r.mpds?r.mpds.map(k=>MPD[k]?MPD[k].label:k).join('+'):'—'}</div>
+          </div>
+        </div>
+        <div class="log-val-row"><span class="log-val-lbl">Gross Sales</span><span class="log-val-v" style="color:var(--app)">₹ ${fmt(r.totalGross)}</span></div>
+        <div class="log-val-row"><span class="log-val-lbl">QR / UPI</span><span class="log-val-v" style="color:#6D28D9">₹ ${fmt(r.qrTotal)}</span></div>
+        <div class="log-val-row"><span class="log-val-lbl">Credits</span><span class="log-val-v" style="color:#B91C1C">₹ ${fmt(r.creditTotal)}</span></div>
+        <div class="log-val-row"><span class="log-val-lbl">Net Cash Expected</span><span class="log-val-v" style="color:#166534">₹ ${fmt(r.cashSales)}</span></div>
+        ${depHtml?`<div style="background:#FFFBEB;margin:4px 0"><div style="font-size:10px;font-weight:800;color:var(--cash);padding:5px 12px;letter-spacing:1px">CASH DEPOSITS</div>${depHtml}</div>`:''}
+        <div class="log-val-row"><span class="log-val-lbl">Total Deposited</span><span class="log-val-v" style="color:var(--cash)">₹ ${fmt(r.cashDeposited||0)}</span></div>
+        <div class="log-val-row"><span class="log-val-lbl">Difference</span><span class="log-val-v"><span class="dpill ${dc}" style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;${dc==='match'?'background:#DCFCE7;color:#15803D':dc==='over'?'background:#DBEAFE;color:#1D6FB8':'background:#FEE2E2;color:#DC2626'}">${dl}</span></span></div>
+        <div class="log-val-row"><span class="log-val-lbl">Total Litres</span><span class="log-val-v">${(r.totalLtr||0).toFixed(3)} L</span></div>
+      </div>`;
+    }).join('');
+    return `<div class="log-day">
+      <div class="log-day-hdr" onclick="toggleLogDay(${di})">
+        <div>
+          <div class="log-day-date">📅 ${ds}</div>
+          <div class="log-day-dsm">${entries.length} shift${entries.length>1?'s':''} · Expires ${expiry}</div>
+        </div>
+        <span id="logArr_${di}" style="color:var(--muted);font-size:14px">▼</span>
       </div>
+      <div id="logDay_${di}" style="display:none;padding:10px 14px">${entriesHtml}</div>
     </div>`;
   }).join('');
 }
 
-function expandLog(i){
-  const log=getShiftLog();
-  const shift=log[i];
-  if(!shift.summary)return;
-  renderReconciliation(shift);
-  document.getElementById('recon-hdr-info').textContent=`${shift.dsmName} · ${shift.date} (Past)`;
-  showScreen('recon');
+function toggleLogDay(i){
+  const el=document.getElementById('logDay_'+i);
+  const arr=document.getElementById('logArr_'+i);
+  if(!el)return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(arr)arr.textContent=open?'▲':'▼';
 }
 
-// ==================== SETTINGS ====================
-function renderSettings(){
-  const cfg=getSettings();
-  document.getElementById('rate-petrol').value=cfg.rates.petrol||'';
-  document.getElementById('rate-diesel').value=cfg.rates.diesel||'';
-  document.getElementById('rate-cng').value=cfg.rates.cng||'';
-  document.getElementById('cashier-name').value=cfg.cashier||'';
-  
-  // Rate history
-  const hist=cfg.rateHistory.slice(-3).reverse();
-  document.getElementById('rate-history').innerHTML=hist.length?
-    'Recent: '+hist.map(h=>`${new Date(h.ts).toLocaleDateString('en-IN')} — P:₹${h.petrol} D:₹${h.diesel} CNG:₹${h.cng}`).join(' | '):'';
-  
-  // DSM list
-  renderDSMList(cfg);
-  // MPD config
-  renderMPDConfig(cfg);
+/* HELPERS */
+function showTab(n){
+  document.querySelectorAll('.tab,.pg').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab_'+n).classList.add('active');
+  document.getElementById('pg_'+n).classList.add('active');
+  document.getElementById('mainScroll').scrollTop=0;
+  if(n==='dashboard') refreshDashboard();
+  if(n==='shift') renderShiftLog();
 }
-
-function renderDSMList(cfg){
-  const list=document.getElementById('dsm-list');
-  list.innerHTML=cfg.dsms.length?cfg.dsms.map((d,i)=>`
-    <div class="deposit-item">
-      <span style="font-size:14px">${d}</span>
-      <button class="btn btn-sm btn-secondary" onclick="removeDSM(${i})">✕</button>
-    </div>`).join(''):'<p style="color:var(--gray-400);font-size:13px">No DSMs added yet</p>';
-}
-
-function addDSM(){
-  const input=document.getElementById('new-dsm');
-  const name=input.value.trim();
-  if(!name)return;
-  const cfg=getSettings();
-  if(cfg.dsms.includes(name)){alert('DSM already exists');return}
-  cfg.dsms.push(name);
-  SS('dsm_list',cfg.dsms);
-  input.value='';
-  renderDSMList(cfg);
-}
-
-function removeDSM(i){
-  const cfg=getSettings();
-  cfg.dsms.splice(i,1);
-  SS('dsm_list',cfg.dsms);
-  renderSettings();
-}
-
-function saveStaff(){
-  const cashier=document.getElementById('cashier-name').value.trim();
-  SS('cashier_name',cashier||'Cashier');
-  alert('Staff settings saved');
-}
-
-function saveRates(){
-  const p=parseFloat(document.getElementById('rate-petrol').value);
-  const d=parseFloat(document.getElementById('rate-diesel').value);
-  const c=parseFloat(document.getElementById('rate-cng').value);
-  if([p,d,c].some(isNaN)||[p,d,c].some(v=>v<=0)){alert('Enter valid rates for all fuels');return}
-  const rates={petrol:p,diesel:d,cng:c};
-  SS('fuel_rates',rates);
-  const hist=S('rate_history',[]);
-  hist.push({...rates,ts:new Date().toISOString()});
-  SS('rate_history',hist);
-  renderSettings();
-  alert('Rates saved successfully');
-}
-
-function renderMPDConfig(cfg){
-  const list=document.getElementById('mpd-config-list');
-  list.innerHTML=cfg.mpds.length?cfg.mpds.map((m,i)=>`
-    <div class="deposit-item">
-      <div>
-        <div style="font-size:14px;font-weight:500">${m.name}</div>
-        <div class="ts">${m.fuel} · 4 nozzles (N1–N4)</div>
-      </div>
-      <button class="btn btn-sm btn-secondary" onclick="removeMPD(${i})">✕</button>
-    </div>`).join(''):'<p style="color:var(--gray-400);font-size:13px">No MPDs configured</p>';
-}
-
-function addMPD(){
-  const name=document.getElementById('new-mpd-name').value.trim();
-  const fuel=document.getElementById('new-mpd-fuel').value;
-  if(!name){alert('Enter MPD name');return}
-  const cfg=getSettings();
-  cfg.mpds.push({id:'mpd'+Date.now(),name,fuel});
-  SS('mpd_list',cfg.mpds);
-  document.getElementById('new-mpd-name').value='';
-  renderMPDConfig(cfg);
-}
-
-function removeMPD(i){
-  const cfg=getSettings();
-  cfg.mpds.splice(i,1);
-  SS('mpd_list',cfg.mpds);
-  renderSettings();
-}
-
-// ==================== INIT ====================
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
-renderHome();
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function rmEl(id){const e=document.getElementById(id);if(e)e.remove()}
+function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(type==='err'?' err':'')+' show';setTimeout(()=>t.classList.remove('show'),2800);}
+function fmt(n){return(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('show')}));
 </script>
 </body>
 </html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⛽ FuelDesk — Master Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Roboto:wght@400;500;700;900&family=Exo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey:"AIzaSyBJhl-6tDX3SvTpQJKbUm7yOfTDoDOdmJk",
+  authDomain:"fueldesk-536b6.firebaseapp.com",
+  projectId:"fueldesk-536b6",
+  storageBucket:"fueldesk-536b6.firebasestorage.app",
+  messagingSenderId:"65760883049",
+  appId:"1:65760883049:web:23163e769156301583cdf8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let currentListener = null;
+
+function startListen(dateFilter, dsmFilter){
+  setStatus('🔄 Connecting…');
+  if(currentListener) currentListener();
+  let q = db.collection('dsm_records');
+  if(dateFilter) q = q.where('date','==',dateFilter);
+  if(dsmFilter)  q = q.where('dsm','==',dsmFilter);
+  if(!dateFilter && !dsmFilter) q = q.limit(300);
+  currentListener = q.onSnapshot(
+    snap => {
+      const recs = snap.docs.map(d=>d.data());
+      const names = [...new Set(recs.map(r=>r.dsm||'Unknown').filter(Boolean))].sort();
+      populateDSMDropdown(names, dsmFilter||'');
+      renderAll(recs, dsmFilter);
+      setStatus('✅ Live · '+recs.length+' record(s)');
+    },
+    () => setStatus('❌ Connection error')
+  );
+}
+
+function populateDSMDropdown(names, selected){
+  const sel = document.getElementById('dsmFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— All DSMs —</option>' +
+    names.map(n=>`<option value="${n}" ${n===selected||n===cur?'selected':''}>${n}</option>`).join('');
+}
+function setStatus(m){
+  document.getElementById('syncStatus').textContent=m;
+  document.getElementById('lastSync').textContent='Updated '+new Date().toLocaleTimeString('en-IN');
+}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#F1F5F9;color:#1E293B;font-family:'Exo 2',sans-serif;min-height:100%}
+
+.hdr{background:#fff;border-bottom:2px solid #E2E8F0;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.hdr-logo{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;color:#1E6B8E;letter-spacing:2px}
+.hdr-sub{font-size:10px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.filter-bar{background:#fff;border-bottom:1px solid #E2E8F0;padding:12px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-bar label{font-size:11px;color:#64748B;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.filter-bar input[type=date]{background:#F8FAFC;border:1.5px solid #CBD5E1;color:#1E293B;font-family:'Roboto',sans-serif;font-size:14px;font-weight:600;padding:8px 12px;border-radius:8px;outline:none}
+.filter-bar input[type=date]:focus{border-color:#1E6B8E}
+.btn-f{background:#1E6B8E;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
+.btn-f.clear{background:#E2E8F0;color:#475569}
+.btn-xl{background:#1D4ED8;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
+
+.main{max-width:1000px;margin:0 auto;padding:20px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:800px){.kpi-row{grid-template-columns:1fr 1fr}}
+@media(max-width:450px){.kpi-row{grid-template-columns:1fr}}
+.kpi{background:#fff;border-radius:12px;padding:16px;border:1px solid #E2E8F0}
+.kpi.green{border-top:3px solid #15803D}
+.kpi.purple{border-top:3px solid #6D28D9}
+.kpi.amber{border-top:3px solid #D97706}
+.kpi.match{border-top:3px solid #15803D}
+.kpi.over{border-top:3px solid #1D6FB8}
+.kpi.short{border-top:3px solid #DC2626}
+.kpi-lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#94A3B8;margin-bottom:8px}
+.kpi-val{font-family:'Roboto',sans-serif;font-size:20px;font-weight:900;line-height:1;margin-bottom:3px}
+.kpi.green .kpi-val{color:#15803D}
+.kpi.purple .kpi-val{color:#6D28D9}
+.kpi.amber .kpi-val{color:#D97706}
+.kpi.match .kpi-val{color:#15803D}
+.kpi.over .kpi-val{color:#1D6FB8}
+.kpi.short .kpi-val{color:#DC2626}
+.kpi-sub{font-size:11px;color:#94A3B8;font-family:'Roboto',sans-serif;margin-top:4px}
+
+.dsm-section{background:#fff;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.dsm-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#F8FAFC;border-bottom:2px solid #E2E8F0;cursor:pointer;user-select:none}
+.dsm-hdr:hover{background:#F0F9FF}
+.dsm-name-txt{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#1E6B8E}
+.dsm-meta{font-size:11px;color:#94A3B8;font-family:'Roboto',sans-serif;margin-top:3px}
+.dsm-pill{font-family:'Roboto',sans-serif;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px}
+.dsm-pill.match{background:#DCFCE7;color:#15803D}
+.dsm-pill.over{background:#DBEAFE;color:#1D6FB8}
+.dsm-pill.short{background:#FEE2E2;color:#DC2626}
+.dsm-body{padding:14px 18px}
+
+.entry-card{border:1px solid #E2E8F0;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.entry-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#F0F9FF;border-bottom:1px solid #E2E8F0}
+.entry-num{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:#1E6B8E}
+.entry-time{font-family:'Roboto',sans-serif;font-size:11px;color:#94A3B8}
+.erows{padding:6px 14px}
+.erow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9}
+.erow:last-child{border-bottom:none}
+.erow-lbl{font-size:12px;color:#64748B;font-weight:600}
+.erow-val{font-family:'Roboto',sans-serif;font-size:13px;font-weight:800}
+.dpill{display:inline-block;padding:3px 10px;border-radius:20px;font-family:'Roboto',sans-serif;font-size:11px;font-weight:800}
+.dpill.match{background:#DCFCE7;color:#15803D}
+.dpill.over{background:#DBEAFE;color:#1D6FB8}
+.dpill.short{background:#FEE2E2;color:#DC2626}
+
+/* CASH DEPOSIT LOG IN MASTER */
+.cash-log-box{background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;margin:6px 0 8px;overflow:hidden}
+.cash-log-title{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#92400E;padding:5px 12px;background:#FEF3C7;border-bottom:1px solid #FCD34D}
+.cash-log-row{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #FEF3C7;font-size:12px}
+.cash-log-row:last-child{border:none}
+.cash-log-ts{color:#92400E;font-family:'Roboto',sans-serif;font-size:11px}
+.cash-log-amt{font-family:'Roboto',sans-serif;font-weight:800;color:#92400E}
+
+.shift-total{background:linear-gradient(135deg,#1E3A5F,#1E6B8E);border-radius:12px;padding:16px;color:#fff;margin-top:8px}
+.st-title{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;opacity:.7;margin-bottom:12px;text-transform:uppercase}
+.st-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+@media(max-width:480px){.st-grid{grid-template-columns:1fr}}
+.st-stat{background:rgba(255,255,255,.1);border-radius:8px;padding:10px 12px}
+.st-val{font-family:'Roboto',sans-serif;font-size:16px;font-weight:900;margin-bottom:2px}
+.st-lbl{font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:1px}
+.st-diff{border-radius:8px;padding:12px;text-align:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)}
+.st-diff-v{font-family:'Roboto',sans-serif;font-size:26px;font-weight:900}
+.st-diff-l{font-size:10px;opacity:.7;margin-top:3px;font-family:'Roboto',sans-serif}
+
+.empty-box{text-align:center;padding:50px 20px;color:#94A3B8;grid-column:1/-1}
+.empty-box .ico{font-size:48px;margin-bottom:12px}
+.empty-box .msg{font-size:15px;font-weight:700;color:#475569}
+.empty-box .sub{font-size:12px;margin-top:6px}
+.sec-lbl{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:#94A3B8;text-transform:uppercase;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-logo">⛽ FUELDESK</div>
+    <div class="hdr-sub">Master Dashboard — Cashier View</div>
+  </div>
+  <div class="hdr-right">
+    <div id="syncStatus" style="font-size:12px;font-weight:700;color:#1E6B8E;font-family:'Roboto',sans-serif">⏳ Loading…</div>
+    <div id="lastSync" style="font-size:10px;color:#94A3B8;font-family:'Roboto',sans-serif"></div>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <label>Date</label>
+  <input type="date" id="dateFilter" onchange="applyFilter()">
+  <label style="margin-left:6px">DSM</label>
+  <select id="dsmFilter" onchange="applyFilter()" style="background:#F8FAFC;border:1.5px solid #CBD5E1;color:#1E293B;font-family:'Roboto',sans-serif;font-size:14px;font-weight:600;padding:8px 12px;border-radius:8px;outline:none;min-width:160px">
+    <option value="">— All DSMs —</option>
+  </select>
+  <button class="btn-f" onclick="applyFilter()">🔍 Load</button>
+  <button class="btn-f clear" onclick="loadToday()">↺ Today</button>
+  <button class="btn-xl" onclick="exportXLS()">📥 Export Excel</button>
+</div>
+
+<div class="main">
+  <div class="kpi-row" id="kpiRow"><div class="kpi"><div class="kpi-lbl">Loading…</div></div></div>
+  <div class="sec-lbl" id="secLbl"></div>
+  <div id="dsmSections"></div>
+</div>
+
+<script>
+let allRecords = [];
+function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function renderAll(recs, dsmFilter){
+  if(dsmFilter) recs = recs.filter(r=>r.dsm===dsmFilter);
+  allRecords = recs;
+  if(!recs.length){
+    document.getElementById('kpiRow').innerHTML=`<div class="kpi" style="grid-column:1/-1"><div class="empty-box"><div class="ico">📊</div><div class="msg">No records for this date</div><div class="sub">Change the date filter or ask DSMs to close their shifts</div></div></div>`;
+    document.getElementById('dsmSections').innerHTML='';
+    document.getElementById('secLbl').textContent='';
+    return;
+  }
+  const groups = {};
+  recs.forEach(r=>{
+    const key=(r.dsm||'Unknown')+'||'+(r.date||'');
+    if(!groups[key]) groups[key]={dsm:r.dsm||'Unknown',date:r.date||'',entries:[]};
+    groups[key].entries.push(r);
+  });
+  Object.values(groups).forEach(g=>g.entries.sort((a,b)=>(a.id||0)-(b.id||0)));
+
+  const tGross = recs.reduce((s,r)=>s+(r.totalGross||0),0);
+  const tQR    = recs.reduce((s,r)=>s+(r.qrTotal||0),0);
+  const tNet   = recs.reduce((s,r)=>s+(r.cashSales||0),0);
+  const tCash  = recs.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0);
+  const tDiff  = tCash-tNet;
+  const dsmCnt = Object.keys(groups).length;
+  const kdc    = tDiff===0?'match':tDiff>0?'over':'short';
+
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi green">
+      <div class="kpi-lbl">Total Gross Sales</div>
+      <div class="kpi-val">₹ ${fmt(tGross)}</div>
+      <div class="kpi-sub">${dsmCnt} DSM · ${recs.length} shift${recs.length>1?'s':''}</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-lbl">Total QR / UPI</div>
+      <div class="kpi-val">₹ ${fmt(tQR)}</div>
+      <div class="kpi-sub">Digital payments</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-lbl">Total Cash Deposited</div>
+      <div class="kpi-val">₹ ${fmt(tCash)}</div>
+      <div class="kpi-sub">Net expected ₹ ${fmt(tNet)}</div>
+    </div>
+    <div class="kpi ${kdc}">
+      <div class="kpi-lbl">Overall Difference</div>
+      <div class="kpi-val">${tDiff>=0?'+':''}₹ ${fmt(Math.abs(tDiff))}</div>
+      <div class="kpi-sub">${tDiff===0?'✅ All balanced':tDiff>0?'⬆ Cash over':'⬇ Cash short'}</div>
+    </div>`;
+
+  const dv=document.getElementById('dateFilter').value;
+  document.getElementById('secLbl').textContent = dv
+    ? new Date(dv).toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})
+    : 'All Records';
+
+  document.getElementById('dsmSections').innerHTML = Object.values(groups).map((g,gi)=>{
+    const e=g.entries;
+    const sG=e.reduce((s,r)=>s+(r.totalGross||0),0);
+    const sQ=e.reduce((s,r)=>s+(r.qrTotal||0),0);
+    const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
+    const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
+    const sN=e.reduce((s,r)=>s+(r.cashSales||0),0);
+    const sC=e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0);
+    const sD=sC-sN;
+    const dc=sD===0?'match':sD>0?'over':'short';
+    const dl=sD===0?'✅ Balanced':sD>0?`⬆ Over ₹${fmt(Math.abs(sD))}`:`⬇ Short ₹${fmt(Math.abs(sD))}`;
+    const ds=g.date?new Date(g.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
+    const diffCol=sD===0?'#86EFAC':sD>0?'#93C5FD':'#FCA5A5';
+
+    const entryCards=e.map((r,i)=>{
+      const d=r.diff||0;
+      const edc=d===0?'match':d>0?'over':'short';
+      const edl=d===0?'✅ Match':d>0?`⬆ Over ₹${fmt(Math.abs(d))}`:`⬇ Short ₹${fmt(Math.abs(d))}`;
+      // Cash deposits — denomData is array of deposit objects in new format
+      const deposits=Array.isArray(r.denomData)?r.denomData:[];
+      const cashDepHtml=deposits.length
+        ? `<div class="cash-log-box">
+            <div class="cash-log-title">💰 Cash Deposits (${deposits.length})</div>
+            ${deposits.map(dep=>`<div class="cash-log-row"><span class="cash-log-ts">🕐 ${dep.ts||'—'}</span><span class="cash-log-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}
+          </div>`
+        : '';
+      const cashVal=r.cashDeposited||r.cashInHand||0;
+      return `<div class="entry-card">
+        <div class="entry-hdr">
+          <div>
+            <div class="entry-num">👤 ${r.dsm} — SHIFT CLOSE</div>
+            <div class="entry-time">🕐 ${r.savedTime||''} · ${(r.mpds||[]).join('+')||'—'}</div>
+          </div>
+        </div>
+        <div class="erows">
+          <div class="erow"><span class="erow-lbl">Gross Sales</span><span class="erow-val" style="color:#1E6B8E">₹ ${fmt(r.totalGross)}</span></div>
+          <div class="erow"><span class="erow-lbl">Total Litres</span><span class="erow-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
+          <div class="erow"><span class="erow-lbl">QR / UPI</span><span class="erow-val" style="color:#6D28D9">₹ ${fmt(r.qrTotal)}</span></div>
+          ${(r.creditTotal||0)>0?`<div class="erow"><span class="erow-lbl">Credits</span><span class="erow-val" style="color:#B91C1C">₹ ${fmt(r.creditTotal)}</span></div>`:''}
+          ${(r.oilTotal||0)>0?`<div class="erow"><span class="erow-lbl">🛢️ Oil Cash</span><span class="erow-val" style="color:#C2410C">₹ ${fmt(r.oilTotal)}</span></div>`:''}
+          <div class="erow"><span class="erow-lbl">Net Cash Expected</span><span class="erow-val" style="color:#166534;font-size:15px">₹ ${fmt(r.cashSales)}</span></div>
+          ${cashDepHtml}
+          <div class="erow"><span class="erow-lbl" style="font-weight:800">Total Cash Deposited</span><span class="erow-val" style="color:#92400E;font-size:15px">₹ ${fmt(cashVal)}</span></div>
+          <div class="erow"><span class="erow-lbl">Difference</span><span class="dpill ${edc}">${edl}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="dsm-section">
+      <div class="dsm-hdr" onclick="toggleSection(${gi})">
+        <div>
+          <div class="dsm-name-txt">👤 ${g.dsm}</div>
+          <div class="dsm-meta">${ds} · ${e.length} shift${e.length>1?'s':''} · Gross ₹ ${fmt(sG)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="dsm-pill ${dc}">${dl}</span>
+          <span id="arr_${gi}" style="color:#94A3B8;font-size:14px;transition:transform .2s">▲</span>
+        </div>
+      </div>
+      <div id="sec_${gi}" class="dsm-body">
+        ${entryCards}
+        <div class="shift-total">
+          <div class="st-title">🏁 DSM Total — ${e.length} Shift${e.length>1?'s':''}</div>
+          <div class="st-grid">
+            <div class="st-stat"><div class="st-val">₹ ${fmt(sG)}</div><div class="st-lbl">Gross Sales</div></div>
+            <div class="st-stat"><div class="st-val" style="color:#a78bfa">₹ ${fmt(sQ)}</div><div class="st-lbl">QR / UPI</div></div>
+            ${sOil>0?`<div class="st-stat"><div class="st-val" style="color:#fb923c">₹ ${fmt(sOil)}</div><div class="st-lbl">🛢️ Oil Cash</div></div>`:''}
+            <div class="st-stat"><div class="st-val" style="color:#86efac">₹ ${fmt(sN)}</div><div class="st-lbl">Net Cash Expected</div></div>
+            <div class="st-stat"><div class="st-val" style="color:#fcd34d">₹ ${fmt(sC)}</div><div class="st-lbl">Cash Deposited</div></div>
+          </div>
+          <div class="st-diff">
+            <div class="st-diff-v" style="color:${diffCol}">${sD>=0?'+':''}₹ ${fmt(Math.abs(sD))}</div>
+            <div class="st-diff-l">${sD===0?'✅ SHIFT BALANCED':sD>0?'⬆ CASH OVER':'⬇ CASH SHORT'}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSection(i){
+  const el=document.getElementById('sec_'+i);
+  const arr=document.getElementById('arr_'+i);
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(arr)arr.textContent=open?'▼':'▲';
+}
+
+function applyFilter(){
+  const d=document.getElementById('dateFilter').value||null;
+  const dsm=document.getElementById('dsmFilter').value||null;
+  startListen(d, dsm);
+}
+function loadToday(){
+  const t=new Date().toISOString().split('T')[0];
+  document.getElementById('dateFilter').value=t;
+  document.getElementById('dsmFilter').value='';
+  startListen(t, null);
+}
+
+function exportXLS(){
+  if(!allRecords.length){alert('No data');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['FUELDESK MASTER REPORT — CASHIER VIEW'],['Generated',new Date().toLocaleString('en-IN')],[''],
+    ['DSM','Date','Time','Gross ₹','QR ₹','Credits ₹','Net Cash ₹','Cash Deposited ₹','Diff ₹','Status','Deposit Log']];
+  allRecords.forEach(r=>{
+    const d=r.diff||0;
+    const deposits=Array.isArray(r.denomData)?r.denomData:[];
+    const depStr=deposits.map(dep=>`${dep.ts}: ₹${(dep.total||0).toFixed(2)}`).join(' | ');
+    rows.push([r.dsm,r.date,r.savedTime||'',r.totalGross,r.qrTotal,r.creditTotal,r.cashSales,r.cashDeposited||r.cashInHand||0,d,d===0?'MATCH':d>0?'OVER':'SHORT',depStr]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:18},{wch:12},{wch:10},{wch:14},{wch:12},{wch:12},{wch:14},{wch:16},{wch:12},{wch:10},{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws,'Master');
+  XLSX.writeFile(wb,'FuelDesk_Master_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+window.onload=()=>{ loadToday(); };
+</script>
+</body>
+</html>
