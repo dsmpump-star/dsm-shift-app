@@ -64,12 +64,12 @@ body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--text);displ
 .rpill.hsd{color:#1E3A8A;border-color:#93C5FD;background:#DBEAFE}
 .rpill.cng{color:#78350F;border-color:#FCD34D;background:#FEF3C7}
 
-.tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);flex-shrink:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-snap-type:x mandatory}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex-shrink:0;padding:11px 11px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
-     color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all .2s;white-space:nowrap;position:relative}
+.tab{flex:0 0 auto;padding:12px 13px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+     color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all .2s;white-space:nowrap;position:relative;scroll-snap-align:start;-webkit-tap-highlight-color:transparent}
 .tab.active{color:var(--app);border-bottom-color:var(--app);background:#F0F9FF}
-.tab .badge{position:absolute;top:7px;right:5px;width:7px;height:7px;border-radius:50%;background:#15803D;border:1.5px solid #fff;display:none}
+.tab .badge{position:absolute;top:6px;right:4px;width:7px;height:7px;border-radius:50%;background:#15803D;border:1.5px solid #fff;display:none}
 .tab .badge.show{display:block}
 
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 100px}
@@ -190,6 +190,25 @@ body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--text);displ
 .cash-saved-total{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--cash-bg);border:2px solid var(--cash-bd);border-radius:10px;margin-top:4px}
 .cash-saved-total .cst-l{font-size:11px;font-weight:800;color:var(--cash);text-transform:uppercase;letter-spacing:1px}
 .cash-saved-total .cst-v{font-family:var(--num);font-size:22px;font-weight:900;color:var(--cash)}
+
+/* AUDIT LOG */
+.audit-section{background:#F8FAFC;border:1px solid var(--border);border-radius:10px;margin-top:10px;overflow:hidden}
+.audit-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#F1F5F9;border-bottom:1px solid var(--border);cursor:pointer}
+.audit-hdr-lbl{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.audit-item{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:11px}
+.audit-item:last-child{border:none}
+.audit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.audit-dot.edit{background:#F59E0B}
+.audit-dot.del{background:#EF4444}
+.audit-dot.add{background:#10B981}
+.audit-body{flex:1}
+.audit-who{font-weight:800;color:var(--text)}
+.audit-what{color:var(--muted);margin-top:1px;line-height:1.4}
+.audit-when{font-size:10px;color:var(--muted);font-family:var(--num);margin-top:2px}
+
+/* EDITING STATE */
+.dep-editing{border-color:var(--app)!important;background:#EFF8FF!important}
+.edit-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;background:#FEF3C7;color:#D97706;border:1px solid #FCD34D;margin-left:6px}
 
 .rrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .rrow:last-child{border-bottom:none}
@@ -325,10 +344,16 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
     <div class="hdr-title">FUELDESK PRO</div>
     <div class="hdr-sub">DSM Daily Register</div>
   </div>
-  <div class="rate-pills">
-    <div class="rpill ms"  id="pill_ms">MS —</div>
-    <div class="rpill hsd" id="pill_hsd">HSD —</div>
-    <div class="rpill cng" id="pill_cng">CNG —</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+    <div class="rate-pills">
+      <div class="rpill ms"  id="pill_ms">MS —</div>
+      <div class="rpill hsd" id="pill_hsd">HSD —</div>
+      <div class="rpill cng" id="pill_cng">CNG —</div>
+    </div>
+    <a href="./master_fixed.html" target="_blank"
+       style="display:inline-flex;align-items:center;gap:5px;background:#F59E0B;border:none;color:#fff;padding:5px 11px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;text-decoration:none;font-family:'Exo 2',sans-serif;text-transform:uppercase;box-shadow:0 2px 6px rgba(0,0,0,.2)">
+      📊 CASHIER
+    </a>
   </div>
 </div>
 
@@ -443,6 +468,7 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
   </div>
   <div class="bb">
     <button class="btn-b" onclick="showTab('meters')">← Back</button>
+    <button onclick="clearAllPayments()" style="background:#FFF5F5;border:1.5px solid #FECACA;color:#DC2626;padding:11px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🗑 Clear</button>
     <button class="btn-n" onclick="showTab('cash')">CASH COUNT →</button>
   </div>
 </div>
@@ -457,20 +483,23 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
         <div id="denomRows"></div>
         <div class="denom-total-row"><span class="dtl">💰 Cash Total</span><span class="dtv" id="cashTotDisp">₹ 0.00</span></div>
       </div>
-      <div class="coins-row">
-        <label>🪙 Coins Total</label>
-        <input class="coins-input" type="number" id="coinsTotal" placeholder="0.00" step="0.50" inputmode="decimal" oninput="calcCash()">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px">
+        <button onclick="saveCashDeposit()" style="background:linear-gradient(135deg,#92400E,#78350F);color:#fff;border:none;padding:15px;border-radius:10px;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 14px rgba(146,64,14,.3)">
+          💰 SAVE DEPOSIT
+        </button>
+        <button onclick="clearDenomInputs()" style="background:#FFF5F5;border:1.5px solid #FECACA;color:#DC2626;padding:15px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">
+          🗑 Clear
+        </button>
       </div>
-      <!-- SAVE CASH BUTTON -->
-      <button onclick="saveCashDeposit()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#92400E,#78350F);color:#fff;border:none;padding:15px;border-radius:10px;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 14px rgba(146,64,14,.3)">
-        💰 SAVE CASH DEPOSIT
-      </button>
     </div>
   </div>
 
-  <!-- SAVED DEPOSITS LOG -->
-  <div class="card">
-    <div class="ch cash">📋 Cash Deposits This Shift</div>
+  <!-- SAVED DEPOSITS LOG — glance view -->
+  <div class="card" id="cashDepositCard">
+    <div class="ch cash" style="justify-content:space-between">
+      <span>📋 Cash Deposits This Shift</span>
+      <span id="depCount" style="font-size:10px;font-weight:700;opacity:.7"></span>
+    </div>
     <div class="cb">
       <div id="cashDepositLog">
         <p style="text-align:center;color:var(--muted);font-size:13px;padding:10px 0">No deposits saved yet</p>
@@ -1025,6 +1054,7 @@ function clearDenomInputs(){
   const dc=document.getElementById('dt_coins');if(dc)dc.textContent='—';
   document.getElementById('cashTotDisp').textContent='₹ 0.00';
   document.getElementById('bdg_c').classList.remove('show');
+  showToast('🗑 Denominations cleared');
 }
 
 /* SAVE CASH DEPOSIT — called each time DSM deposits cash */
@@ -1041,25 +1071,44 @@ function saveCashDeposit(){
   showToast('💰 ₹'+fmt(total)+' deposited at '+ts);
 }
 
+function clearAllPayments(){
+  if(!confirm('Clear all QR, Credit and Oil entries?')) return;
+  const ufill=document.getElementById('ufill_a'), ppe=document.getElementById('ppe_a');
+  if(ufill)ufill.value=''; if(ppe)ppe.value='';
+  for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
+  for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
+  addCredit();
+  for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i);if(el)el.remove();} oilN=0;
+  calcPay();
+  showToast('🗑 Payments cleared');
+}
+
 function renderCashDepositLog(){
   const cont=document.getElementById('cashDepositLog');
   const totEl=document.getElementById('cashSavedTotalRow');
   const totAmt=document.getElementById('cashSavedTotalAmt');
+  const depCount=document.getElementById('depCount');
   if(!S.cashDeposits.length){
     cont.innerHTML='<p style="text-align:center;color:var(--muted);font-size:13px;padding:10px 0">No deposits saved yet</p>';
     if(totEl)totEl.style.display='none';
+    if(depCount)depCount.textContent='';
     return;
   }
   const grandTotal=S.cashDeposits.reduce((s,d)=>s+d.total,0);
+  if(depCount)depCount.textContent=S.cashDeposits.length+' deposit'+(S.cashDeposits.length>1?'s':'');
   cont.innerHTML=S.cashDeposits.map((dep,i)=>{
-    const denomStr=DENOMS.filter(d=>dep.denoms[d]>0).map(d=>`₹${d}×${dep.denoms[d]}`).join(' · ')+(dep.denoms.coins>0?' · Coins ₹'+dep.denoms.coins:'');
+    const denomStr=DENOMS.filter(d=>dep.denoms[d]>0)
+      .map(d=>`<span style="display:inline-block;background:#FEF3C7;border:1px solid #FCD34D;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;color:#92400E;margin:2px 2px 0 0">₹${d}×${dep.denoms[d]}</span>`).join('');
+    const coinsStr=dep.denoms.coins>0?`<span style="display:inline-block;background:#FEF9C3;border:1px solid #FCD34D;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;color:#92400E;margin:2px 2px 0 0">🪙₹${dep.denoms.coins}</span>`:'';
     return `<div class="cash-dep-item">
       <div style="flex:1">
-        <div class="cash-dep-amount">₹ ${fmt(dep.total)}</div>
-        <div class="cash-dep-ts">🕐 ${dep.ts}</div>
-        ${denomStr?`<div class="cash-dep-denoms">${denomStr}</div>`:''}
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div class="cash-dep-amount">₹ ${fmt(dep.total)}</div>
+          <div class="cash-dep-ts">🕐 ${dep.ts}</div>
+        </div>
+        ${denomStr||coinsStr?`<div style="margin-top:6px;line-height:1.8">${denomStr}${coinsStr}</div>`:''}
       </div>
-      <button class="cash-dep-del" onclick="deleteCashDeposit(${i})">✕</button>
+      <button class="cash-dep-del" onclick="deleteCashDeposit(${i})" title="Delete this deposit">✕</button>
     </div>`;
   }).join('');
   if(totEl){totEl.style.display='flex';}
