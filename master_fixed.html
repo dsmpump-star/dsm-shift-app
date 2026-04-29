@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⛽ FuelDesk — Master Dashboard</title>
+<title>⛽ FuelDesk — Cashier Master</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Roboto:wght@400;500;700;900&family=Exo+2:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -20,6 +20,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 let currentListener = null;
+let allRecords = [];
+let knownDSMs = [];
+let activeDSM = '';
 
 function startListen(dateFilter, dsmFilter){
   setStatus('🔄 Connecting…');
@@ -28,117 +31,179 @@ function startListen(dateFilter, dsmFilter){
   if(dateFilter) q = q.where('date','==',dateFilter);
   if(dsmFilter)  q = q.where('dsm','==',dsmFilter);
   if(!dateFilter && !dsmFilter) q = q.limit(300);
-  currentListener = q.onSnapshot(
-    snap => {
-      const recs = snap.docs.map(d=>d.data());
-      const names = [...new Set(recs.map(r=>r.dsm||'Unknown').filter(Boolean))].sort();
-      populateDSMDropdown(names, dsmFilter||'');
-      renderAll(recs, dsmFilter);
-      setStatus('✅ Live · '+recs.length+' record(s)');
-    },
-    () => setStatus('❌ Connection error')
-  );
+  currentListener = q.onSnapshot(snap=>{
+    const recs = snap.docs.map(d=>({...d.data(),_id:d.id}));
+    allRecords = recs;
+    setStatus('✅ Live · '+recs.length+' record(s)');
+    renderAll(recs, dsmFilter);
+  }, ()=>setStatus('❌ Connection error'));
 }
 
-function populateDSMDropdown(names, selected){
-  const sel = document.getElementById('dsmFilter');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— All DSMs —</option>' +
-    names.map(n=>`<option value="${n}" ${n===selected||n===cur?'selected':''}>${n}</option>`).join('');
+function loadDSMNames(dateFilter){
+  let q = db.collection('dsm_records');
+  if(dateFilter) q = q.where('date','==',dateFilter);
+  q.get().then(snap=>{
+    knownDSMs = [...new Set(snap.docs.map(d=>d.data().dsm||'').filter(Boolean))].sort();
+    rebuildChips(activeDSM);
+  }).catch(()=>{});
 }
+
 function setStatus(m){
-  document.getElementById('syncStatus').textContent=m;
-  document.getElementById('lastSync').textContent='Updated '+new Date().toLocaleTimeString('en-IN');
+  document.getElementById('syncStatus').textContent = m;
+  document.getElementById('lastSync').textContent = 'Updated '+new Date().toLocaleTimeString('en-IN');
 }
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#F1F5F9;color:#1E293B;font-family:'Exo 2',sans-serif;min-height:100%}
 
-.hdr{background:#fff;border-bottom:2px solid #E2E8F0;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.hdr-logo{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;color:#1E6B8E;letter-spacing:2px}
-.hdr-sub{font-size:10px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hdr{background:linear-gradient(120deg,#1a3a5c,#1E6B8E);padding:13px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.hdr-logo{font-family:'Orbitron',monospace;font-size:17px;font-weight:900;color:#fff;letter-spacing:2px;line-height:1}
+.hdr-sub{font-size:9px;color:rgba(255,255,255,.6);letter-spacing:3px;text-transform:uppercase;margin-top:3px}
+.hdr-right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+#syncStatus{font-size:11px;font-weight:700;color:#fff;font-family:'Roboto',sans-serif}
+#lastSync{font-size:9px;color:rgba(255,255,255,.55);font-family:'Roboto',sans-serif}
 
-.filter-bar{background:#fff;border-bottom:1px solid #E2E8F0;padding:12px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.filter-bar label{font-size:11px;color:#64748B;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-.filter-bar input[type=date]{background:#F8FAFC;border:1.5px solid #CBD5E1;color:#1E293B;font-family:'Roboto',sans-serif;font-size:14px;font-weight:600;padding:8px 12px;border-radius:8px;outline:none}
-.filter-bar input[type=date]:focus{border-color:#1E6B8E}
-.btn-f{background:#1E6B8E;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
-.btn-f.clear{background:#E2E8F0;color:#475569}
-.btn-xl{background:#1D4ED8;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
+/* CONTROL BAR */
+.ctrl-bar{background:#fff;border-bottom:2px solid #E2E8F0;padding:14px 20px;position:sticky;top:52px;z-index:90;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.ctrl-row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.ctrl-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#64748B}
+.date-inp{background:#F8FAFC;border:2px solid #CBD5E1;color:#1E293B;font-family:'Roboto',sans-serif;font-size:14px;font-weight:600;padding:9px 12px;border-radius:9px;outline:none;-webkit-appearance:none;transition:.2s}
+.date-inp:focus{border-color:#1E6B8E;box-shadow:0 0 0 3px rgba(30,107,142,.1)}
+.btn-today{background:#F1F5F9;color:#475569;border:1.5px solid #CBD5E1;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
+.btn-today:hover{background:#E2E8F0}
+.btn-xl{background:#1D4ED8;color:#fff;border:none;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Exo 2',sans-serif}
 
-.main{max-width:1000px;margin:0 auto;padding:20px}
+/* DSM CHIPS */
+.chip-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;margin-bottom:8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:8px 16px;border-radius:20px;border:2px solid #CBD5E1;background:#F8FAFC;cursor:pointer;font-size:12px;font-weight:700;color:#475569;transition:.15s;font-family:'Exo 2',sans-serif;white-space:nowrap;user-select:none}
+.chip:hover{border-color:#1E6B8E;color:#1E6B8E;background:#EFF8FF}
+.chip.active{border-color:#1E6B8E;background:#1E6B8E;color:#fff}
+.chip.all{border-color:#94A3B8}
+.chip.all.active{background:#334155;border-color:#334155;color:#fff}
 
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-@media(max-width:800px){.kpi-row{grid-template-columns:1fr 1fr}}
-@media(max-width:450px){.kpi-row{grid-template-columns:1fr}}
-.kpi{background:#fff;border-radius:12px;padding:16px;border:1px solid #E2E8F0}
-.kpi.green{border-top:3px solid #15803D}
-.kpi.purple{border-top:3px solid #6D28D9}
-.kpi.amber{border-top:3px solid #D97706}
-.kpi.match{border-top:3px solid #15803D}
-.kpi.over{border-top:3px solid #1D6FB8}
-.kpi.short{border-top:3px solid #DC2626}
-.kpi-lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#94A3B8;margin-bottom:8px}
-.kpi-val{font-family:'Roboto',sans-serif;font-size:20px;font-weight:900;line-height:1;margin-bottom:3px}
-.kpi.green .kpi-val{color:#15803D}
-.kpi.purple .kpi-val{color:#6D28D9}
-.kpi.amber .kpi-val{color:#D97706}
-.kpi.match .kpi-val{color:#15803D}
-.kpi.over .kpi-val{color:#1D6FB8}
-.kpi.short .kpi-val{color:#DC2626}
-.kpi-sub{font-size:11px;color:#94A3B8;font-family:'Roboto',sans-serif;margin-top:4px}
+/* MAIN */
+.main{max-width:960px;margin:0 auto;padding:20px}
 
-.dsm-section{background:#fff;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.dsm-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#F8FAFC;border-bottom:2px solid #E2E8F0;cursor:pointer;user-select:none}
-.dsm-hdr:hover{background:#F0F9FF}
-.dsm-name-txt{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#1E6B8E}
-.dsm-meta{font-size:11px;color:#94A3B8;font-family:'Roboto',sans-serif;margin-top:3px}
-.dsm-pill{font-family:'Roboto',sans-serif;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px}
-.dsm-pill.match{background:#DCFCE7;color:#15803D}
-.dsm-pill.over{background:#DBEAFE;color:#1D6FB8}
-.dsm-pill.short{background:#FEE2E2;color:#DC2626}
-.dsm-body{padding:14px 18px}
+/* DSM BANNER */
+.dsm-banner{background:linear-gradient(135deg,#1E3A5F,#1E6B8E);border-radius:14px;padding:18px 22px;margin-bottom:18px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.dsm-banner-name{font-family:'Orbitron',monospace;font-size:19px;font-weight:900;letter-spacing:1px}
+.dsm-banner-meta{font-size:11px;opacity:.7;margin-top:4px}
+.dsm-banner-right{text-align:right}
+.dsm-banner-gross-lbl{font-size:9px;opacity:.6;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
+.dsm-banner-gross{font-family:'Roboto',sans-serif;font-size:22px;font-weight:900}
 
-.entry-card{border:1px solid #E2E8F0;border-radius:10px;margin-bottom:10px;overflow:hidden}
-.entry-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#F0F9FF;border-bottom:1px solid #E2E8F0}
-.entry-num{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:#1E6B8E}
-.entry-time{font-family:'Roboto',sans-serif;font-size:11px;color:#94A3B8}
-.erows{padding:6px 14px}
-.erow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9}
-.erow:last-child{border-bottom:none}
-.erow-lbl{font-size:12px;color:#64748B;font-weight:600}
-.erow-val{font-family:'Roboto',sans-serif;font-size:13px;font-weight:800}
-.dpill{display:inline-block;padding:3px 10px;border-radius:20px;font-family:'Roboto',sans-serif;font-size:11px;font-weight:800}
-.dpill.match{background:#DCFCE7;color:#15803D}
-.dpill.over{background:#DBEAFE;color:#1D6FB8}
-.dpill.short{background:#FEE2E2;color:#DC2626}
+/* SALES vs CASH — THE MAIN CARD */
+.svc{border-radius:14px;overflow:hidden;margin-bottom:18px;border:3px solid}
+.svc.green{border-color:#22C55E;background:#F0FDF4}
+.svc.red  {border-color:#EF4444;background:#FFF5F5}
+.svc.bal  {border-color:#22C55E;background:#F0FDF4}
+.svc-top{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:2px solid}
+.svc.green .svc-top{background:#DCFCE7;border-color:#86EFAC}
+.svc.red   .svc-top{background:#FEE2E2;border-color:#FECACA}
+.svc.bal   .svc-top{background:#DCFCE7;border-color:#86EFAC}
+.svc-top-lbl{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:1.5px}
+.svc.green .svc-top-lbl,.svc.bal .svc-top-lbl{color:#166534}
+.svc.red   .svc-top-lbl{color:#991B1B}
+.svc-badge{font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px;font-family:'Roboto',sans-serif}
+.svc.green .svc-badge,.svc.bal .svc-badge{background:#166534;color:#fff}
+.svc.red   .svc-badge{background:#DC2626;color:#fff}
+.svc-body{padding:18px}
+.svc-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:480px){.svc-cols{grid-template-columns:1fr}}
+.svc-col{border-radius:12px;padding:16px;text-align:center;border:2px solid}
+.svc-col.expected{background:#EFF6FF;border-color:#93C5FD}
+.svc-col.received{background:#FFFBEB;border-color:#FCD34D}
+.svc-col-lbl{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
+.svc-col.expected .svc-col-lbl{color:#1E3A8A}
+.svc-col.received .svc-col-lbl{color:#92400E}
+.svc-col-val{font-family:'Roboto',sans-serif;font-size:28px;font-weight:900;line-height:1;margin-bottom:5px}
+.svc-col.expected .svc-col-val{color:#1D4ED8}
+.svc-col.received .svc-col-val{color:#92400E}
+.svc-col-sub{font-size:10px;color:#64748B;font-family:'Roboto',sans-serif;line-height:1.4}
 
-/* CASH DEPOSIT LOG IN MASTER */
-.cash-log-box{background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;margin:6px 0 8px;overflow:hidden}
-.cash-log-title{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#92400E;padding:5px 12px;background:#FEF3C7;border-bottom:1px solid #FCD34D}
-.cash-log-row{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #FEF3C7;font-size:12px}
+/* DIFF BIG */
+.diff-big{border-radius:12px;padding:18px;text-align:center;border:2px solid}
+.diff-big.green{background:#DCFCE7;border-color:#86EFAC}
+.diff-big.red  {background:#FEE2E2;border-color:#FECACA}
+.diff-big.bal  {background:#DCFCE7;border-color:#86EFAC}
+.diff-big-lbl{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;font-family:'Exo 2',sans-serif}
+.diff-big.green .diff-big-lbl,.diff-big.bal .diff-big-lbl{color:#166534}
+.diff-big.red   .diff-big-lbl{color:#991B1B}
+.diff-big-val{font-family:'Roboto',sans-serif;font-size:46px;font-weight:900;line-height:1}
+.diff-big.green .diff-big-val,.diff-big.bal .diff-big-val{color:#166534}
+.diff-big.red   .diff-big-val{color:#DC2626}
+.diff-big-msg{font-size:12px;margin-top:8px;font-weight:600;font-family:'Roboto',sans-serif}
+.diff-big.green .diff-big-msg,.diff-big.bal .diff-big-msg{color:#166534}
+.diff-big.red   .diff-big-msg{color:#B91C1C}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:#fff;border-radius:11px;padding:14px;border:1px solid #E2E8F0;border-top:3px solid}
+.kpi.kb{border-top-color:#1E6B8E}.kpi.kp{border-top-color:#7C3AED}.kpi.kg{border-top-color:#15803D}.kpi.ka{border-top-color:#D97706}
+.kpi-lbl{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#94A3B8;margin-bottom:7px}
+.kpi-val{font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;line-height:1}
+.kpi.kb .kpi-val{color:#1E6B8E}.kpi.kp .kpi-val{color:#7C3AED}.kpi.kg .kpi-val{color:#15803D}.kpi.ka .kpi-val{color:#D97706}
+.kpi-sub{font-size:10px;color:#94A3B8;margin-top:4px;font-family:'Roboto',sans-serif}
+
+/* SHIFTS */
+.sec-lbl{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:#94A3B8;text-transform:uppercase;margin-bottom:10px}
+.shift-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.shift-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;cursor:pointer}
+.shift-hdr:hover{background:#F0F9FF}
+.shift-num{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:#1E6B8E;letter-spacing:1px}
+.shift-time{font-family:'Roboto',sans-serif;font-size:11px;color:#94A3B8;margin-top:2px}
+.shift-body{padding:14px 16px}
+.s-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #F1F5F9;font-size:13px}
+.s-row:last-child{border:none}
+.s-lbl{color:#64748B;font-weight:600}
+.s-val{font-family:'Roboto',sans-serif;font-weight:800;color:#1E293B}
+
+/* INLINE MINI DIFF */
+.dpill{display:inline-block;padding:4px 12px;border-radius:20px;font-family:'Roboto',sans-serif;font-size:11px;font-weight:800}
+.dpill.green{background:#DCFCE7;color:#15803D}
+.dpill.red  {background:#FEE2E2;color:#DC2626}
+.dpill.bal  {background:#DCFCE7;color:#15803D}
+
+/* SHIFT INLINE DIFF BOX */
+.sdiff{border-radius:10px;padding:13px;text-align:center;margin-top:10px;border:2px solid}
+.sdiff.green{background:#DCFCE7;border-color:#86EFAC}
+.sdiff.red  {background:#FEE2E2;border-color:#FECACA}
+.sdiff.bal  {background:#DCFCE7;border-color:#86EFAC}
+.sdiff-val{font-family:'Roboto',sans-serif;font-size:30px;font-weight:900}
+.sdiff.green .sdiff-val,.sdiff.bal .sdiff-val{color:#166534}
+.sdiff.red .sdiff-val{color:#DC2626}
+.sdiff-lbl{font-size:10px;font-weight:700;margin-top:4px;font-family:'Roboto',sans-serif}
+.sdiff.green .sdiff-lbl,.sdiff.bal .sdiff-lbl{color:#166534}
+.sdiff.red .sdiff-lbl{color:#B91C1C}
+
+/* CASH LOG */
+.cash-log{background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;margin:8px 0;overflow:hidden}
+.cash-log-hdr{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#92400E;padding:6px 12px;background:#FEF3C7;border-bottom:1px solid #FCD34D}
+.cash-log-row{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #FEF3C7;font-size:12px}
 .cash-log-row:last-child{border:none}
-.cash-log-ts{color:#92400E;font-family:'Roboto',sans-serif;font-size:11px}
-.cash-log-amt{font-family:'Roboto',sans-serif;font-weight:800;color:#92400E}
+.cl-ts{color:#78350F;font-family:'Roboto',sans-serif;font-size:11px}
+.cl-amt{font-family:'Roboto',sans-serif;font-weight:800;color:#92400E}
 
-.shift-total{background:linear-gradient(135deg,#1E3A5F,#1E6B8E);border-radius:12px;padding:16px;color:#fff;margin-top:8px}
-.st-title{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;opacity:.7;margin-bottom:12px;text-transform:uppercase}
-.st-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-@media(max-width:480px){.st-grid{grid-template-columns:1fr}}
-.st-stat{background:rgba(255,255,255,.1);border-radius:8px;padding:10px 12px}
-.st-val{font-family:'Roboto',sans-serif;font-size:16px;font-weight:900;margin-bottom:2px}
-.st-lbl{font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:1px}
-.st-diff{border-radius:8px;padding:12px;text-align:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)}
-.st-diff-v{font-family:'Roboto',sans-serif;font-size:26px;font-weight:900}
-.st-diff-l{font-size:10px;opacity:.7;margin-top:3px;font-family:'Roboto',sans-serif}
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:#94A3B8}
+.empty-ico{font-size:52px;margin-bottom:14px}
+.empty-msg{font-size:15px;font-weight:700;color:#475569;margin-bottom:6px}
+.empty-sub{font-size:12px}
 
-.empty-box{text-align:center;padding:50px 20px;color:#94A3B8;grid-column:1/-1}
-.empty-box .ico{font-size:48px;margin-bottom:12px}
-.empty-box .msg{font-size:15px;font-weight:700;color:#475569}
-.empty-box .sub{font-size:12px;margin-top:6px}
-.sec-lbl{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:#94A3B8;text-transform:uppercase;margin-bottom:12px}
+/* SHIFT MINI SVC */
+.mini-svc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;padding-bottom:12px;border-bottom:2px dashed #E2E8F0}
+.mini-box{border-radius:9px;padding:11px;text-align:center;border:1.5px solid}
+.mini-box.exp{background:#EFF6FF;border-color:#93C5FD}
+.mini-box.rec{background:#FFFBEB;border-color:#FCD34D}
+.mini-box-lbl{font-size:8px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+.mini-box.exp .mini-box-lbl{color:#1E3A8A}
+.mini-box.rec .mini-box-lbl{color:#92400E}
+.mini-box-val{font-family:'Roboto',sans-serif;font-size:17px;font-weight:900}
+.mini-box.exp .mini-box-val{color:#1D4ED8}
+.mini-box.rec .mini-box-val{color:#92400E}
 </style>
 </head>
 <body>
@@ -146,203 +211,253 @@ html,body{background:#F1F5F9;color:#1E293B;font-family:'Exo 2',sans-serif;min-he
 <div class="hdr">
   <div>
     <div class="hdr-logo">⛽ FUELDESK</div>
-    <div class="hdr-sub">Master Dashboard — Cashier View</div>
+    <div class="hdr-sub">Cashier Master View</div>
   </div>
   <div class="hdr-right">
-    <div id="syncStatus" style="font-size:12px;font-weight:700;color:#1E6B8E;font-family:'Roboto',sans-serif">⏳ Loading…</div>
-    <div id="lastSync" style="font-size:10px;color:#94A3B8;font-family:'Roboto',sans-serif"></div>
+    <div id="syncStatus">⏳ Loading…</div>
+    <div id="lastSync"></div>
   </div>
 </div>
 
-<div class="filter-bar">
-  <label>Date</label>
-  <input type="date" id="dateFilter" onchange="applyFilter()">
-  <label style="margin-left:6px">DSM</label>
-  <select id="dsmFilter" onchange="applyFilter()" style="background:#F8FAFC;border:1.5px solid #CBD5E1;color:#1E293B;font-family:'Roboto',sans-serif;font-size:14px;font-weight:600;padding:8px 12px;border-radius:8px;outline:none;min-width:160px">
-    <option value="">— All DSMs —</option>
-  </select>
-  <button class="btn-f" onclick="applyFilter()">🔍 Load</button>
-  <button class="btn-f clear" onclick="loadToday()">↺ Today</button>
-  <button class="btn-xl" onclick="exportXLS()">📥 Export Excel</button>
+<div class="ctrl-bar">
+  <div class="ctrl-row1">
+    <span class="ctrl-label">Date</span>
+    <input type="date" class="date-inp" id="dateFilter" onchange="onDateChange()">
+    <button class="btn-today" onclick="loadToday()">↺ Today</button>
+    <button class="btn-xl" onclick="exportXLS()">📥 Excel</button>
+  </div>
+  <div>
+    <div class="chip-label" style="margin-bottom:8px">Select DSM to view</div>
+    <div class="chips" id="chipsCont">
+      <div class="chip all active" data-dsm="" onclick="selectDSM(this,'')">All DSMs</div>
+    </div>
+  </div>
 </div>
 
 <div class="main">
-  <div class="kpi-row" id="kpiRow"><div class="kpi"><div class="kpi-lbl">Loading…</div></div></div>
-  <div class="sec-lbl" id="secLbl"></div>
-  <div id="dsmSections"></div>
+  <div id="mainContent">
+    <div class="empty">
+      <div class="empty-ico">⛽</div>
+      <div class="empty-msg">Select a date above</div>
+      <div class="empty-sub">Then tap a DSM chip to see their sales vs cash</div>
+    </div>
+  </div>
 </div>
 
 <script>
-let allRecords = [];
-function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmt(n){return(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 
-function renderAll(recs, dsmFilter){
-  if(dsmFilter) recs = recs.filter(r=>r.dsm===dsmFilter);
-  allRecords = recs;
-  if(!recs.length){
-    document.getElementById('kpiRow').innerHTML=`<div class="kpi" style="grid-column:1/-1"><div class="empty-box"><div class="ico">📊</div><div class="msg">No records for this date</div><div class="sub">Change the date filter or ask DSMs to close their shifts</div></div></div>`;
-    document.getElementById('dsmSections').innerHTML='';
-    document.getElementById('secLbl').textContent='';
-    return;
-  }
-  const groups = {};
-  recs.forEach(r=>{
-    const key=(r.dsm||'Unknown')+'||'+(r.date||'');
-    if(!groups[key]) groups[key]={dsm:r.dsm||'Unknown',date:r.date||'',entries:[]};
-    groups[key].entries.push(r);
-  });
-  Object.values(groups).forEach(g=>g.entries.sort((a,b)=>(a.id||0)-(b.id||0)));
-
-  const tGross = recs.reduce((s,r)=>s+(r.totalGross||0),0);
-  const tQR    = recs.reduce((s,r)=>s+(r.qrTotal||0),0);
-  const tNet   = recs.reduce((s,r)=>s+(r.cashSales||0),0);
-  const tCash  = recs.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0);
-  const tDiff  = tCash-tNet;
-  const dsmCnt = Object.keys(groups).length;
-  const kdc    = tDiff===0?'match':tDiff>0?'over':'short';
-
-  document.getElementById('kpiRow').innerHTML=`
-    <div class="kpi green">
-      <div class="kpi-lbl">Total Gross Sales</div>
-      <div class="kpi-val">₹ ${fmt(tGross)}</div>
-      <div class="kpi-sub">${dsmCnt} DSM · ${recs.length} shift${recs.length>1?'s':''}</div>
-    </div>
-    <div class="kpi purple">
-      <div class="kpi-lbl">Total QR / UPI</div>
-      <div class="kpi-val">₹ ${fmt(tQR)}</div>
-      <div class="kpi-sub">Digital payments</div>
-    </div>
-    <div class="kpi amber">
-      <div class="kpi-lbl">Total Cash Deposited</div>
-      <div class="kpi-val">₹ ${fmt(tCash)}</div>
-      <div class="kpi-sub">Net expected ₹ ${fmt(tNet)}</div>
-    </div>
-    <div class="kpi ${kdc}">
-      <div class="kpi-lbl">Overall Difference</div>
-      <div class="kpi-val">${tDiff>=0?'+':''}₹ ${fmt(Math.abs(tDiff))}</div>
-      <div class="kpi-sub">${tDiff===0?'✅ All balanced':tDiff>0?'⬆ Cash over':'⬇ Cash short'}</div>
-    </div>`;
-
-  const dv=document.getElementById('dateFilter').value;
-  document.getElementById('secLbl').textContent = dv
-    ? new Date(dv).toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})
-    : 'All Records';
-
-  document.getElementById('dsmSections').innerHTML = Object.values(groups).map((g,gi)=>{
-    const e=g.entries;
-    const sG=e.reduce((s,r)=>s+(r.totalGross||0),0);
-    const sQ=e.reduce((s,r)=>s+(r.qrTotal||0),0);
-    const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
-    const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
-    const sN=e.reduce((s,r)=>s+(r.cashSales||0),0);
-    const sC=e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0);
-    const sD=sC-sN;
-    const dc=sD===0?'match':sD>0?'over':'short';
-    const dl=sD===0?'✅ Balanced':sD>0?`⬆ Over ₹${fmt(Math.abs(sD))}`:`⬇ Short ₹${fmt(Math.abs(sD))}`;
-    const ds=g.date?new Date(g.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
-    const diffCol=sD===0?'#86EFAC':sD>0?'#93C5FD':'#FCA5A5';
-
-    const entryCards=e.map((r,i)=>{
-      const d=r.diff||0;
-      const edc=d===0?'match':d>0?'over':'short';
-      const edl=d===0?'✅ Match':d>0?`⬆ Over ₹${fmt(Math.abs(d))}`:`⬇ Short ₹${fmt(Math.abs(d))}`;
-      // Cash deposits — denomData is array of deposit objects in new format
-      const deposits=Array.isArray(r.denomData)?r.denomData:[];
-      const cashDepHtml=deposits.length
-        ? `<div class="cash-log-box">
-            <div class="cash-log-title">💰 Cash Deposits (${deposits.length})</div>
-            ${deposits.map(dep=>`<div class="cash-log-row"><span class="cash-log-ts">🕐 ${dep.ts||'—'}</span><span class="cash-log-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}
-          </div>`
-        : '';
-      const cashVal=r.cashDeposited||r.cashInHand||0;
-      return `<div class="entry-card">
-        <div class="entry-hdr">
-          <div>
-            <div class="entry-num">👤 ${r.dsm} — SHIFT CLOSE</div>
-            <div class="entry-time">🕐 ${r.savedTime||''} · ${(r.mpds||[]).join('+')||'—'}</div>
-          </div>
-        </div>
-        <div class="erows">
-          <div class="erow"><span class="erow-lbl">Gross Sales</span><span class="erow-val" style="color:#1E6B8E">₹ ${fmt(r.totalGross)}</span></div>
-          <div class="erow"><span class="erow-lbl">Total Litres</span><span class="erow-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
-          <div class="erow"><span class="erow-lbl">QR / UPI</span><span class="erow-val" style="color:#6D28D9">₹ ${fmt(r.qrTotal)}</span></div>
-          ${(r.creditTotal||0)>0?`<div class="erow"><span class="erow-lbl">Credits</span><span class="erow-val" style="color:#B91C1C">₹ ${fmt(r.creditTotal)}</span></div>`:''}
-          ${(r.oilTotal||0)>0?`<div class="erow"><span class="erow-lbl">🛢️ Oil Cash</span><span class="erow-val" style="color:#C2410C">₹ ${fmt(r.oilTotal)}</span></div>`:''}
-          <div class="erow"><span class="erow-lbl">Net Cash Expected</span><span class="erow-val" style="color:#166534;font-size:15px">₹ ${fmt(r.cashSales)}</span></div>
-          ${cashDepHtml}
-          <div class="erow"><span class="erow-lbl" style="font-weight:800">Total Cash Deposited</span><span class="erow-val" style="color:#92400E;font-size:15px">₹ ${fmt(cashVal)}</span></div>
-          <div class="erow"><span class="erow-lbl">Difference</span><span class="dpill ${edc}">${edl}</span></div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="dsm-section">
-      <div class="dsm-hdr" onclick="toggleSection(${gi})">
-        <div>
-          <div class="dsm-name-txt">👤 ${g.dsm}</div>
-          <div class="dsm-meta">${ds} · ${e.length} shift${e.length>1?'s':''} · Gross ₹ ${fmt(sG)}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="dsm-pill ${dc}">${dl}</span>
-          <span id="arr_${gi}" style="color:#94A3B8;font-size:14px;transition:transform .2s">▲</span>
-        </div>
-      </div>
-      <div id="sec_${gi}" class="dsm-body">
-        ${entryCards}
-        <div class="shift-total">
-          <div class="st-title">🏁 DSM Total — ${e.length} Shift${e.length>1?'s':''}</div>
-          <div class="st-grid">
-            <div class="st-stat"><div class="st-val">₹ ${fmt(sG)}</div><div class="st-lbl">Gross Sales</div></div>
-            <div class="st-stat"><div class="st-val" style="color:#a78bfa">₹ ${fmt(sQ)}</div><div class="st-lbl">QR / UPI</div></div>
-            ${sOil>0?`<div class="st-stat"><div class="st-val" style="color:#fb923c">₹ ${fmt(sOil)}</div><div class="st-lbl">🛢️ Oil Cash</div></div>`:''}
-            <div class="st-stat"><div class="st-val" style="color:#86efac">₹ ${fmt(sN)}</div><div class="st-lbl">Net Cash Expected</div></div>
-            <div class="st-stat"><div class="st-val" style="color:#fcd34d">₹ ${fmt(sC)}</div><div class="st-lbl">Cash Deposited</div></div>
-          </div>
-          <div class="st-diff">
-            <div class="st-diff-v" style="color:${diffCol}">${sD>=0?'+':''}₹ ${fmt(Math.abs(sD))}</div>
-            <div class="st-diff-l">${sD===0?'✅ SHIFT BALANCED':sD>0?'⬆ CASH OVER':'⬇ CASH SHORT'}</div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+function onDateChange(){
+  const d=document.getElementById('dateFilter').value;
+  if(!d)return;
+  loadDSMNames(d);
+  startListen(d, activeDSM||null);
 }
 
-function toggleSection(i){
-  const el=document.getElementById('sec_'+i);
-  const arr=document.getElementById('arr_'+i);
-  const open=el.style.display!=='none';
-  el.style.display=open?'none':'block';
-  if(arr)arr.textContent=open?'▼':'▲';
-}
-
-function applyFilter(){
-  const d=document.getElementById('dateFilter').value||null;
-  const dsm=document.getElementById('dsmFilter').value||null;
-  startListen(d, dsm);
-}
 function loadToday(){
   const t=new Date().toISOString().split('T')[0];
   document.getElementById('dateFilter').value=t;
-  document.getElementById('dsmFilter').value='';
+  loadDSMNames(t);
   startListen(t, null);
+}
+
+function selectDSM(el, name){
+  activeDSM=name;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.dsm===name));
+  const d=document.getElementById('dateFilter').value||null;
+  startListen(d, name||null);
+}
+
+function rebuildChips(selected){
+  const cont=document.getElementById('chipsCont');
+  cont.innerHTML=`<div class="chip all${!selected?' active':''}" data-dsm="" onclick="selectDSM(this,'')">All DSMs</div>`;
+  knownDSMs.forEach(n=>{
+    const c=document.createElement('div');
+    c.className='chip'+(n===selected?' active':'');
+    c.dataset.dsm=n;
+    c.textContent='👤 '+n;
+    c.onclick=()=>selectDSM(c,n);
+    cont.appendChild(c);
+  });
+}
+
+function renderAll(recs, dsmFilter){
+  const cont=document.getElementById('mainContent');
+  const list=dsmFilter?recs.filter(r=>r.dsm===dsmFilter):recs;
+
+  if(!list.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-ico">📋</div><div class="empty-msg">${dsmFilter?'No data for '+dsmFilter:'No records for this date'}</div><div class="empty-sub">Records appear once DSMs close their shifts</div></div>`;
+    return;
+  }
+
+  // Group by DSM
+  const groups={};
+  list.forEach(r=>{
+    const k=r.dsm||'Unknown';
+    if(!groups[k]) groups[k]={dsm:k,date:r.date||'',entries:[]};
+    groups[k].entries.push(r);
+  });
+  Object.values(groups).forEach(g=>g.entries.sort((a,b)=>(a.id||0)-(b.id||0)));
+
+  const dv=document.getElementById('dateFilter').value;
+  const dateStr=dv?new Date(dv).toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'All Dates';
+  const groupArr=Object.values(groups);
+  let html=`<div style="font-family:'Orbitron',monospace;font-size:9px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">📅 ${dateStr}</div>`;
+
+  groupArr.forEach((g,gi)=>{
+    const e=g.entries;
+    const sG =e.reduce((s,r)=>s+(r.totalGross||0),0);
+    const sQ =e.reduce((s,r)=>s+(r.qrTotal||0),0);
+    const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
+    const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
+    const sN =e.reduce((s,r)=>s+(r.cashSales||0),0);   // net cash EXPECTED
+    const sC =e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0); // cash RECEIVED
+    const sD =sC-sN;   // + = over (green), - = short (red)
+
+    const isOver=sD>0.01, isShort=sD<-0.01, isBal=!isOver&&!isShort;
+    const cls=isOver?'green':isShort?'red':'bal';
+    const statusTxt=isBal?'✅ BALANCED':isOver?'⬆ CASH OVER':'⬇ CASH SHORT';
+    const statusDesc=isBal?'Cash exactly matches sales':isOver?`DSM gave ₹${fmt(Math.abs(sD))} extra`:`DSM is short by ₹${fmt(Math.abs(sD))}`;
+
+    const ds=g.date?new Date(g.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
+
+    // ── DSM BANNER ──
+    html+=`<div class="dsm-banner">
+      <div>
+        <div class="dsm-banner-name">👤 ${g.dsm}</div>
+        <div class="dsm-banner-meta">${ds} · ${e.length} shift${e.length>1?'s':''}</div>
+      </div>
+      <div class="dsm-banner-right">
+        <div class="dsm-banner-gross-lbl">Gross Sales</div>
+        <div class="dsm-banner-gross">₹ ${fmt(sG)}</div>
+      </div>
+    </div>`;
+
+    // ── SALES vs CASH MAIN CARD ──
+    html+=`<div class="svc ${cls}">
+      <div class="svc-top">
+        <div class="svc-top-lbl">💰 SALES vs CASH RECEIVED</div>
+        <div class="svc-badge">${statusTxt}</div>
+      </div>
+      <div class="svc-body">
+        <div class="svc-cols">
+          <div class="svc-col expected">
+            <div class="svc-col-lbl">Net Cash Expected</div>
+            <div class="svc-col-val">₹ ${fmt(sN)}</div>
+            <div class="svc-col-sub">Gross ₹${fmt(sG)}<br>− QR ₹${fmt(sQ)}${sCr>0?'<br>− Credits ₹'+fmt(sCr):''}${sOil>0?'<br>+ Oil ₹'+fmt(sOil):''}</div>
+          </div>
+          <div class="svc-col received">
+            <div class="svc-col-lbl">Cash Received</div>
+            <div class="svc-col-val">₹ ${fmt(sC)}</div>
+            <div class="svc-col-sub">Deposited by DSM<br>${e.reduce((s,r)=>s+(Array.isArray(r.denomData)?r.denomData.length:0),0)} deposit entry(s)</div>
+          </div>
+        </div>
+        <div class="diff-big ${cls}">
+          <div class="diff-big-lbl">${isBal?'PERFECTLY BALANCED':isOver?'CASH OVER BY':'CASH SHORT BY'}</div>
+          <div class="diff-big-val">${isOver?'+ ':''}₹ ${fmt(Math.abs(sD))}</div>
+          <div class="diff-big-msg">${statusDesc}</div>
+        </div>
+      </div>
+    </div>`;
+
+    // ── KPI STRIP ──
+    html+=`<div class="kpis">
+      <div class="kpi kb"><div class="kpi-lbl">Gross Sales</div><div class="kpi-val">₹ ${fmt(sG)}</div><div class="kpi-sub">${e.reduce((s,r)=>s+(r.totalLtr||0),0).toFixed(2)} L</div></div>
+      <div class="kpi kp"><div class="kpi-lbl">QR / UPI</div><div class="kpi-val">₹ ${fmt(sQ)}</div><div class="kpi-sub">Digital</div></div>
+      <div class="kpi kg"><div class="kpi-lbl">Net Expected</div><div class="kpi-val">₹ ${fmt(sN)}</div><div class="kpi-sub">After deductions</div></div>
+      <div class="kpi ka"><div class="kpi-lbl">Cash Deposited</div><div class="kpi-val">₹ ${fmt(sC)}</div><div class="kpi-sub">By DSM</div></div>
+    </div>`;
+
+    // ── SHIFT-WISE ──
+    html+=`<div class="sec-lbl">Shift-wise breakdown · ${e.length} shift${e.length>1?'s':''}</div>`;
+    e.forEach((r,i)=>{
+      const cash=r.cashDeposited||r.cashInHand||0;
+      const exp=r.cashSales||0;
+      const d=cash-exp;
+      const ov=d>0.01,sh=d<-0.01,bl=!ov&&!sh;
+      const sc=ov?'green':sh?'red':'bal';
+      const pt=bl?'✅ Match':ov?`⬆ Over ₹${fmt(Math.abs(d))}`:`⬇ Short ₹${fmt(Math.abs(d))}`;
+      const deposits=Array.isArray(r.denomData)?r.denomData:[];
+      const cashLog=deposits.length?`<div class="cash-log">
+        <div class="cash-log-hdr">💰 Cash Deposits (${deposits.length})</div>
+        ${deposits.map(dep=>`<div class="cash-log-row"><span class="cl-ts">🕐 ${dep.ts||'—'}</span><span class="cl-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}
+      </div>`:'';
+
+      html+=`<div class="shift-card">
+        <div class="shift-hdr" onclick="tog('sb_${gi}_${i}','sa_${gi}_${i}')">
+          <div>
+            <div class="shift-num">SHIFT ${i+1}</div>
+            <div class="shift-time">🕐 ${r.savedTime||'—'} · ${(r.mpds||[]).join('+')||'—'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="dpill ${sc}">${pt}</span>
+            <span id="sa_${gi}_${i}" style="color:#94A3B8;font-size:11px">▼</span>
+          </div>
+        </div>
+        <div id="sb_${gi}_${i}" style="display:none">
+          <div class="shift-body">
+            <div class="mini-svc">
+              <div class="mini-box exp">
+                <div class="mini-box-lbl">Expected Cash</div>
+                <div class="mini-box-val">₹ ${fmt(exp)}</div>
+              </div>
+              <div class="mini-box rec">
+                <div class="mini-box-lbl">Cash Received</div>
+                <div class="mini-box-val">₹ ${fmt(cash)}</div>
+              </div>
+            </div>
+            <div class="s-row"><span class="s-lbl">Gross Sales</span><span class="s-val" style="color:#1E6B8E">₹ ${fmt(r.totalGross)}</span></div>
+            <div class="s-row"><span class="s-lbl">Total Litres</span><span class="s-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
+            <div class="s-row"><span class="s-lbl">QR / UPI</span><span class="s-val" style="color:#6D28D9">− ₹ ${fmt(r.qrTotal)}</span></div>
+            ${(r.creditTotal||0)>0?`<div class="s-row"><span class="s-lbl">Credits</span><span class="s-val" style="color:#B91C1C">− ₹ ${fmt(r.creditTotal)}</span></div>`:''}
+            ${(r.oilTotal||0)>0?`<div class="s-row"><span class="s-lbl">🛢️ Oil Cash</span><span class="s-val" style="color:#C2410C">+ ₹ ${fmt(r.oilTotal)}</span></div>`:''}
+            <div class="s-row" style="border-top:2px solid #E2E8F0;margin-top:4px;padding-top:10px">
+              <span class="s-lbl" style="font-size:14px;font-weight:800;color:#166534">NET EXPECTED</span>
+              <span class="s-val" style="font-size:15px;color:#166534">₹ ${fmt(exp)}</span>
+            </div>
+            ${cashLog}
+            <div class="s-row"><span class="s-lbl" style="font-weight:800">DEPOSITED</span><span class="s-val" style="color:#92400E;font-size:15px">₹ ${fmt(cash)}</span></div>
+            <div class="sdiff ${sc}">
+              <div class="sdiff-val">${ov?'+ ':''}₹ ${fmt(Math.abs(d))}</div>
+              <div class="sdiff-lbl">${pt}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    });
+
+    if(gi<groupArr.length-1) html+=`<hr style="border:none;border-top:2px dashed #E2E8F0;margin:24px 0">`;
+  });
+
+  cont.innerHTML=html;
+}
+
+function tog(bid,aid){
+  const el=document.getElementById(bid),arr=document.getElementById(aid);
+  if(!el)return;
+  const open=el.style.display==='none'||!el.style.display;
+  el.style.display=open?'block':'none';
+  if(arr)arr.textContent=open?'▲':'▼';
 }
 
 function exportXLS(){
   if(!allRecords.length){alert('No data');return;}
   const wb=XLSX.utils.book_new();
-  const rows=[['FUELDESK MASTER REPORT — CASHIER VIEW'],['Generated',new Date().toLocaleString('en-IN')],[''],
-    ['DSM','Date','Time','Gross ₹','QR ₹','Credits ₹','Net Cash ₹','Cash Deposited ₹','Diff ₹','Status','Deposit Log']];
+  const rows=[['FUELDESK — CASHIER MASTER REPORT'],['Generated',new Date().toLocaleString('en-IN')],
+    ['Date',document.getElementById('dateFilter').value||'All'],['DSM',activeDSM||'All'],[''],
+    ['DSM','Date','Shift Time','MPDs','Gross ₹','QR ₹','Credits ₹','Oil ₹','Net Expected ₹','Cash Deposited ₹','Difference ₹','Status','Deposit Log']];
   allRecords.forEach(r=>{
-    const d=r.diff||0;
-    const deposits=Array.isArray(r.denomData)?r.denomData:[];
-    const depStr=deposits.map(dep=>`${dep.ts}: ₹${(dep.total||0).toFixed(2)}`).join(' | ');
-    rows.push([r.dsm,r.date,r.savedTime||'',r.totalGross,r.qrTotal,r.creditTotal,r.cashSales,r.cashDeposited||r.cashInHand||0,d,d===0?'MATCH':d>0?'OVER':'SHORT',depStr]);
+    const cash=r.cashDeposited||r.cashInHand||0, exp=r.cashSales||0, d=cash-exp;
+    const deps=Array.isArray(r.denomData)?r.denomData:[];
+    rows.push([r.dsm,r.date,r.savedTime||'',(r.mpds||[]).join('+'),
+      r.totalGross||0,r.qrTotal||0,r.creditTotal||0,r.oilTotal||0,
+      exp,cash,d,Math.abs(d)<0.01?'MATCH':d>0?'OVER':'SHORT',
+      deps.map(x=>`${x.ts}: ₹${fmt(x.total)}`).join(' | ')]);
   });
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:18},{wch:12},{wch:10},{wch:14},{wch:12},{wch:12},{wch:14},{wch:16},{wch:12},{wch:10},{wch:50}];
+  ws['!cols']=[{wch:16},{wch:12},{wch:12},{wch:12},{wch:14},{wch:12},{wch:12},{wch:10},{wch:16},{wch:16},{wch:14},{wch:10},{wch:60}];
   XLSX.utils.book_append_sheet(wb,ws,'Master');
-  XLSX.writeFile(wb,'FuelDesk_Master_'+new Date().toISOString().split('T')[0]+'.xlsx');
+  XLSX.writeFile(wb,'FuelDesk_Master_'+(document.getElementById('dateFilter').value||'all')+'.xlsx');
 }
 
 window.onload=()=>{ loadToday(); };
