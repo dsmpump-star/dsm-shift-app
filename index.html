@@ -28,6 +28,7 @@ const db = firebase.firestore();
    To revoke: set active:false or delete the doc
 */
 let currentUser = null;
+let currentRole = null; // 'admin' or 'dsm'
 
 async function checkAccess(pin){
   try {
@@ -35,7 +36,7 @@ async function checkAccess(pin){
     if(!doc.exists) return {ok:false, reason:'PIN not found'};
     const data = doc.data();
     if(!data.active) return {ok:false, reason:'Access revoked'};
-    return {ok:true, name:data.name||'User'};
+    return {ok:true, name:data.name||'User', role:data.role||'dsm'};
   } catch(e){
     return {ok:false, reason:'Connection error'};
   }
@@ -473,7 +474,7 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
     <div class="ch app">📅 Sale Date</div>
     <div class="cb"><div class="field"><label>Date</label><input type="date" id="saleDate"></div></div>
   </div>
-  <div class="card">
+  <div class="card" id="dsmSelectCard">
     <div class="ch app">👤 DSM</div>
     <div class="cb">
       <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -645,7 +646,82 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
 
 </div><!-- /scroll -->
 
-<!-- ADD DSM MODAL -->
+<!-- ADMIN PANEL (Harshit only) -->
+<div id="adminScreen" style="display:none;min-height:100vh;background:var(--bg);flex-direction:column">
+  <div class="hdr">
+    <div class="hdr-icon">⛽</div>
+    <div class="hdr-text">
+      <div class="hdr-title">FUELDESK ADMIN</div>
+      <div class="hdr-sub" id="adminSubHdr">MASTER PANEL</div>
+    </div>
+    <button onclick="adminLogout()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer">LOGOUT</button>
+  </div>
+  <div style="padding:16px;overflow-y:auto;flex:1">
+
+    <!-- DSM LIST -->
+    <div class="card">
+      <div class="ch app">👥 DSM Accounts</div>
+      <div class="cb">
+        <div id="adminDSMList"><div style="text-align:center;color:var(--muted);padding:20px">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ADD DSM -->
+    <div class="card">
+      <div class="ch" style="background:#F0FDF4;color:#166534;border-color:#86EFAC">➕ Add New DSM</div>
+      <div class="cb">
+        <div class="field"><label>Full Name</label><input type="text" id="adm_dsmName" placeholder="DSM full name"></div>
+        <div class="field">
+          <label>4-Digit PIN</label>
+          <input type="number" id="adm_dsmPin" placeholder="e.g. 5678" inputmode="numeric"
+            style="letter-spacing:8px;font-size:22px;font-weight:700;text-align:center">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">DSM uses this PIN to log in</div>
+        </div>
+        <button onclick="adminAddDSM()" style="width:100%;background:linear-gradient(135deg,#166534,#14532D);color:#fff;border:none;padding:14px;border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px">
+          ✅ ADD DSM & SET PIN
+        </button>
+      </div>
+    </div>
+
+    <!-- WIPE DATA -->
+    <div class="card">
+      <div class="ch red">🗑 Wipe DSM Data</div>
+      <div class="cb">
+        <div class="field">
+          <label>Select DSM to wipe</label>
+          <select id="adm_wipeDSM" style="width:100%;background:#F8FAFC;border:1.5px solid var(--border2);color:var(--text);font-family:'Exo 2',sans-serif;font-size:15px;font-weight:600;padding:11px 13px;border-radius:9px;outline:none">
+            <option value="">— Select DSM —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Date to wipe (leave blank for all dates)</label>
+          <input type="date" id="adm_wipeDate">
+        </div>
+        <button onclick="adminWipeData()" style="width:100%;background:#DC2626;color:#fff;border:none;padding:14px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">
+          🗑 WIPE THIS DSM'S DATA
+        </button>
+      </div>
+    </div>
+
+    <!-- RATES (admin can update rates) -->
+    <div class="card">
+      <div class="ch app">⛽ Fuel Rates</div>
+      <div class="cb">
+        <div class="rate-grid">
+          <div class="rbox ms"><label>MS · Petrol</label><input type="number" id="adm_r_ms" placeholder="0.00" step="0.01" inputmode="decimal" oninput="adminSaveRates()"><div class="rsaved" id="adm_rs_ms"></div></div>
+          <div class="rbox hsd"><label>HSD · Diesel</label><input type="number" id="adm_r_hsd" placeholder="0.00" step="0.01" inputmode="decimal" oninput="adminSaveRates()"><div class="rsaved" id="adm_rs_hsd"></div></div>
+          <div class="rbox cng"><label>CNG · Gas</label><input type="number" id="adm_r_cng" placeholder="0.00" step="0.01" inputmode="decimal" oninput="adminSaveRates()"><div class="rsaved" id="adm_rs_cng"></div></div>
+        </div>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">⚠️ Rates apply to all DSMs immediately</p>
+      </div>
+    </div>
+
+    <a href="./master_fixed.html" target="_blank"
+       style="display:flex;align-items:center;justify-content:center;gap:8px;background:#F59E0B;color:#fff;padding:15px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:16px">
+      📊 Open Cashier Master View
+    </a>
+  </div>
+</div>
 <div class="modal-ov" id="dsmMod">
   <div class="modal">
     <div class="modal-ttl">ADD NEW DSM <button class="modal-x" onclick="closeModal('dsmMod')">✕</button></div>
@@ -682,11 +758,23 @@ function initApp(){
   localStorage.removeItem('fdp_shift'); localStorage.removeItem('fdp_cash_deps');
   purgeOldDSMLog();
   renderShiftLog();
-  if(currentUser){
-    const sub=document.querySelector('.hdr-sub');
-    if(sub)sub.textContent='👤 '+currentUser;
-  }
-  // Watch for cashier deletions — sync to localStorage immediately
+
+  // Auto-set DSM from logged-in user — no selection needed
+  S.dsm = currentUser;
+  const sub=document.querySelector('.hdr-sub');
+  if(sub) sub.textContent='👤 '+currentUser;
+
+  // Hide DSM select card — DSM is already known from PIN
+  const dsmCard=document.querySelector('#pg_setup .card:nth-child(3)');
+  // Use ID approach — mark the DSM card
+  document.getElementById('dsmSelectCard').style.display='none';
+  // Show their name in banner
+  const ban=document.getElementById('dsmBanner');
+  if(ban){ban.style.display='block';ban.textContent='👤 '+currentUser+' — logged in';}
+  // Show MPD card immediately
+  document.getElementById('mpdCard').style.display='block';
+  updateMPDGrid();
+
   startDeletionListener();
 }
 
@@ -753,15 +841,16 @@ function purgeLocalByFirestoreId(fid){
 }
 
 window.onload = ()=>{
-  // Check if already authenticated this session
   const u=sessionStorage.getItem('fd_user'), p=sessionStorage.getItem('fd_pin');
   if(u&&p){
-    checkAccess(p).then(r=>{
-      if(r.ok){ currentUser=r.name; document.getElementById('lockScreen').style.display='none'; initApp(); }
-      else { sessionStorage.clear(); }
+    checkAccess(p).then(res=>{
+      if(res.ok){
+        currentUser=res.name; currentRole=res.role||'dsm';
+        document.getElementById('lockScreen').style.display='none';
+        if(currentRole==='admin') initAdmin(); else initApp();
+      } else { sessionStorage.clear(); }
     });
   }
-  // Otherwise show PIN screen (already visible by default)
 };
 
 function loadStorage(){
@@ -913,7 +1002,9 @@ function buildNozzleSelector(){
 }
 
 function gotoMeters(){
-  if(!S.dsm){showToast('Select a DSM','err');return;}
+  // DSM is set from logged-in user — no selection needed
+  if(!S.dsm) S.dsm=currentUser;
+  if(!S.dsm){showToast('Login error — no DSM name','err');return;}
   if(!S.selMPDs.length){showToast('Select at least one MPD','err');return;}
   const totN=Object.values(S.selNozzles).reduce((s,a)=>s+a.length,0);
   if(!totN){showToast('Select at least one nozzle','err');return;}
@@ -1902,12 +1993,14 @@ async function pinSubmit(){
   const result = await checkAccess(pinEntry);
   if(result.ok){
     currentUser = result.name;
-    // Store session (clears on tab close)
+    currentRole = result.role||'dsm';
     sessionStorage.setItem('fd_user', result.name);
     sessionStorage.setItem('fd_pin', pinEntry);
+    sessionStorage.setItem('fd_role', currentRole);
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('lockUser').textContent='';
-    initApp();
+    if(currentRole==='admin') initAdmin();
+    else initApp();
   } else {
     document.getElementById('lockErr').textContent='❌ '+result.reason;
     for(let i=0;i<4;i++) document.getElementById('pd'+i).classList.add('error');
@@ -1952,6 +2045,135 @@ async function deleteLastShift(){
   localStorage.setItem('fdp_dsmlog',JSON.stringify(updated));
   renderShiftLog();
   showToast('🗑 Shift entry deleted');
+}
+
+/* ═══════════ ADMIN PANEL ═══════════ */
+function initAdmin(){
+  document.getElementById('adminScreen').style.display='flex';
+  document.getElementById('adminSubHdr').textContent='👑 '+currentUser+' — Master';
+  const s=JSON.parse(localStorage.getItem('fdp_s')||'{}');
+  const rates=s.rates||{ms:0,hsd:0,cng:0};
+  if(rates.ms) document.getElementById('adm_r_ms').value=rates.ms;
+  if(rates.hsd) document.getElementById('adm_r_hsd').value=rates.hsd;
+  if(rates.cng) document.getElementById('adm_r_cng').value=rates.cng;
+  adminLoadDSMs();
+}
+
+function adminLogout(){
+  sessionStorage.clear();
+  document.getElementById('adminScreen').style.display='none';
+  document.getElementById('lockScreen').style.display='flex';
+  pinEntry=''; updatePinDots();
+}
+
+async function adminLoadDSMs(){
+  const list=document.getElementById('adminDSMList');
+  const wipeSel=document.getElementById('adm_wipeDSM');
+  list.innerHTML='<div style="text-align:center;color:var(--muted);padding:16px">Loading…</div>';
+  try{
+    const snap=await db.collection('access_list').where('role','==','dsm').get();
+    if(snap.empty){list.innerHTML='<p style="color:var(--muted);text-align:center;padding:14px">No DSMs added yet</p>';return;}
+    wipeSel.innerHTML='<option value="">— Select DSM —</option>';
+    list.innerHTML=snap.docs.map(doc=>{
+      const d=doc.data(), pin=doc.id;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text)">👤 ${d.name}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">PIN: ${pin} · ${d.active?'✅ Active':'❌ Blocked'}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="adminToggleDSM('${pin}',${d.active})" style="background:${d.active?'#FFF5F5':'#F0FDF4'};border:1px solid ${d.active?'#FECACA':'#86EFAC'};color:${d.active?'#DC2626':'#166534'};padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">${d.active?'Block':'Unblock'}</button>
+          <button onclick="adminRemoveDSM('${pin}','${d.name}')" style="background:#FFF5F5;border:1px solid #FECACA;color:#DC2626;width:28px;height:28px;border-radius:50%;font-size:13px;cursor:pointer">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+    snap.docs.forEach(doc=>{
+      const o=document.createElement('option');
+      o.value=doc.data().name; o.textContent=doc.data().name;
+      wipeSel.appendChild(o);
+    });
+  }catch(e){list.innerHTML='<p style="color:#DC2626;text-align:center;padding:14px">Failed to load</p>';}
+}
+
+async function adminAddDSM(){
+  const nm=document.getElementById('adm_dsmName').value.trim().toUpperCase();
+  const pin=document.getElementById('adm_dsmPin').value.trim();
+  if(!nm){showAdminToast('Enter DSM name','err');return;}
+  if(!pin||pin.length!==4||isNaN(pin)){showAdminToast('Enter a valid 4-digit PIN','err');return;}
+  try{
+    const ex=await db.collection('access_list').doc(pin).get();
+    if(ex.exists){showAdminToast('PIN '+pin+' already in use','err');return;}
+    await db.collection('access_list').doc(pin).set({name:nm,active:true,role:'dsm',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    document.getElementById('adm_dsmName').value='';
+    document.getElementById('adm_dsmPin').value='';
+    showAdminToast('✅ '+nm+' added · PIN: '+pin);
+    adminLoadDSMs();
+    // Also save to local dsmList
+    const s=JSON.parse(localStorage.getItem('fdp_s')||'{}');
+    if(!s.dsmList) s.dsmList=[];
+    if(!s.dsmList.find(d=>d.name===nm)) s.dsmList.push({name:nm,pin});
+    localStorage.setItem('fdp_s',JSON.stringify(s));
+  }catch(e){showAdminToast('Failed to add DSM','err');}
+}
+
+async function adminToggleDSM(pin, currentlyActive){
+  try{
+    await db.collection('access_list').doc(pin).update({active:!currentlyActive});
+    showAdminToast(currentlyActive?'DSM blocked':'DSM unblocked');
+    adminLoadDSMs();
+  }catch(e){showAdminToast('Failed','err');}
+}
+
+async function adminRemoveDSM(pin, name){
+  if(!confirm('Remove '+name+'?\nThis blocks their PIN. Their past data is kept in Firestore.')) return;
+  try{
+    await db.collection('access_list').doc(pin).update({active:false});
+    showAdminToast('❌ '+name+' blocked');
+    adminLoadDSMs();
+  }catch(e){showAdminToast('Failed','err');}
+}
+
+async function adminWipeData(){
+  const dsm=document.getElementById('adm_wipeDSM').value;
+  const date=document.getElementById('adm_wipeDate').value;
+  if(!dsm){showAdminToast('Select a DSM first','err');return;}
+  const msg=date?`Wipe all data for ${dsm} on ${date}?`:`Wipe ALL data for ${dsm} across all dates?`;
+  if(!confirm(msg+'\n\nThis permanently deletes from Firestore.')) return;
+  try{
+    // Wipe dsm_records
+    let q1=db.collection('dsm_records').where('dsm','==',dsm);
+    if(date) q1=q1.where('date','==',date);
+    const s1=await q1.get();
+    // Wipe live_cash
+    let q2=db.collection('live_cash').where('dsm','==',dsm);
+    if(date) q2=q2.where('date','==',date);
+    const s2=await q2.get();
+    const batch=db.batch();
+    s1.docs.forEach(d=>batch.delete(d.ref));
+    s2.docs.forEach(d=>batch.delete(d.ref));
+    await batch.commit();
+    showAdminToast('🗑 '+dsm+(date?' ('+date+')':'')+' data wiped · '+(s1.size+s2.size)+' records deleted');
+  }catch(e){showAdminToast('Wipe failed: '+e.message,'err');}
+}
+
+function adminSaveRates(){
+  const ms=parseFloat(document.getElementById('adm_r_ms').value)||0;
+  const hsd=parseFloat(document.getElementById('adm_r_hsd').value)||0;
+  const cng=parseFloat(document.getElementById('adm_r_cng').value)||0;
+  const s=JSON.parse(localStorage.getItem('fdp_s')||'{}');
+  s.rates={ms,hsd,cng}; localStorage.setItem('fdp_s',JSON.stringify(s));
+  const saved=t=>t>0?'✓ ₹'+t.toFixed(2)+' saved':'';
+  document.getElementById('adm_rs_ms').textContent=saved(ms);
+  document.getElementById('adm_rs_hsd').textContent=saved(hsd);
+  document.getElementById('adm_rs_cng').textContent=saved(cng);
+}
+
+function showAdminToast(msg,type=''){
+  let t=document.getElementById('adminToast');
+  if(!t){t=document.createElement('div');t.id='adminToast';t.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);color:#fff;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;font-family:"Exo 2",sans-serif';document.body.appendChild(t);}
+  t.textContent=msg; t.style.background=type==='err'?'#DC2626':'#166534';
+  t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(-20px)';},3000);
 }
 
 /* HELPERS */
