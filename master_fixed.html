@@ -431,6 +431,7 @@ function renderAll(){
         <div><div class="shift-num">SHIFT ${i+1}</div><div class="shift-time">🕐 ${r.savedTime||'—'} · ${(r.mpds||[]).join('+')||'—'}</div></div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="dpill ${sc}">${pt}</span>
+          <button onclick="event.stopPropagation();deleteShift('${r._id}',${i})" style="background:#FFF5F5;border:1.5px solid #FECACA;color:#DC2626;width:28px;height:28px;border-radius:50%;font-size:13px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center" title="Delete this shift">🗑</button>
           <span id="sa_${i}" style="color:#94A3B8;font-size:11px">▼</span>
         </div>
       </div>
@@ -487,6 +488,52 @@ function buildLiveCashPanel(dsm, deposits, total, isPostClose){
       <span style="font-family:'Roboto',sans-serif;font-size:22px;font-weight:900;color:#92400E">₹ ${fmt(total)}</span>
     </div>
   </div>`;
+}
+
+async function deleteShift(firestoreId, idx){
+  if(!firestoreId){alert('Cannot delete — no record ID found.');return;}
+  const r=allRecords[idx];
+  const label=r?`Shift ${idx+1} · ${r.savedTime||''} · ₹${fmt(r.totalGross||0)}`:`Shift ${idx+1}`;
+  if(!confirm(`🗑 Permanently delete?\n\n${label}\n\nThis removes it from Firestore and the master view immediately. This cannot be undone.`)) return;
+
+  setStatus('🗑 Deleting…');
+  try{
+    // Delete from dsm_records
+    await db.collection('dsm_records').doc(firestoreId).delete();
+
+    // Also delete related live_cash entries for this DSM+date
+    if(r?.dsm && r?.date){
+      const lcSnap=await db.collection('live_cash')
+        .where('date','==',r.date)
+        .where('dsm','==',r.dsm)
+        .get();
+      const batch=db.batch();
+      lcSnap.docs.forEach(d=>batch.delete(d.ref));
+      if(lcSnap.docs.length>0) await batch.commit();
+    }
+
+    setStatus('✅ Deleted · '+activeDSM);
+    showToast('🗑 Shift deleted successfully');
+  } catch(e){
+    console.error(e);
+    setStatus('❌ Delete failed');
+    showToast('Delete failed — check connection','err');
+  }
+}
+
+function showToast(msg, type=''){
+  let t=document.getElementById('masterToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='masterToast';
+    t.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#166534;color:#fff;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px;opacity:0;transition:all .3s;z-index:9998;pointer-events:none;white-space:nowrap;font-family:"Exo 2",sans-serif';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.background=type==='err'?'#DC2626':'#166534';
+  t.style.opacity='1';
+  t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(-20px)';},2800);
 }
 
 function tog(bid,aid){
