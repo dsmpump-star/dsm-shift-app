@@ -21,15 +21,48 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+/* ── ACCESS CONTROL ──
+   Firestore collection: access_list
+   Document ID = PIN (e.g. "1234")
+   Fields: { name: "Harshit", active: true }
+   To revoke: set active:false or delete the doc
+*/
+let currentUser = null;
+
+async function checkAccess(pin){
+  try {
+    const doc = await db.collection('access_list').doc(String(pin)).get();
+    if(!doc.exists) return {ok:false, reason:'PIN not found'};
+    const data = doc.data();
+    if(!data.active) return {ok:false, reason:'Access revoked'};
+    return {ok:true, name:data.name||'User'};
+  } catch(e){
+    return {ok:false, reason:'Connection error'};
+  }
+}
+
 window._saveToCloud = async function(record) {
   try {
-    await db.collection("dsm_records").add({
+    const docRef = await db.collection("dsm_records").add({
       ...record,
-      savedAt: firebase.firestore.FieldValue.serverTimestamp()
+      savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      savedBy: currentUser||'unknown'
     });
-    return true;
+    // Store Firestore doc ID alongside local record for deletion
+    return docRef.id;
   } catch(e) {
     console.error("Firebase error:", e);
+    return null;
+  }
+};
+
+window._deleteFromCloud = async function(firestoreId) {
+  if(!firestoreId) return false;
+  try {
+    await db.collection("dsm_records").doc(firestoreId).delete();
+    return true;
+  } catch(e) {
+    console.error("Delete error:", e);
     return false;
   }
 };
@@ -328,6 +361,29 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
 .oil-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .oil-total{font-family:'Roboto',sans-serif;font-size:12px;font-weight:800;color:#C2410C;margin-top:6px;text-align:right}
 
+/* PIN LOCK SCREEN */
+.lock-screen{position:fixed;inset:0;background:linear-gradient(160deg,#0f2744,#1E6B8E);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 24px}
+.lock-logo{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;color:#fff;letter-spacing:3px;margin-bottom:6px;text-align:center}
+.lock-sub{font-size:11px;color:rgba(255,255,255,.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:40px;text-align:center}
+.lock-card{background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.lock-title{font-family:'Exo 2',sans-serif;font-size:14px;font-weight:800;color:#1E293B;text-align:center;margin-bottom:20px;letter-spacing:.5px}
+.pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:24px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid #CBD5E1;background:#F1F5F9;transition:.2s}
+.pin-dot.filled{background:#1E6B8E;border-color:#1E6B8E;transform:scale(1.1)}
+.pin-dot.error{background:#DC2626;border-color:#DC2626;animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pin-btn{background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:12px;padding:16px;font-family:'Roboto',sans-serif;font-size:22px;font-weight:700;color:#1E293B;cursor:pointer;transition:.15s;text-align:center}
+.pin-btn:active{background:#E0F2FE;border-color:#1E6B8E;transform:scale(.95)}
+.pin-btn.clear{background:#FFF5F5;border-color:#FECACA;color:#DC2626;font-size:14px;font-weight:800}
+.pin-btn.go{background:linear-gradient(135deg,#1E6B8E,#155E75);border-color:#1E6B8E;color:#fff;font-size:14px;font-weight:800}
+.lock-err{text-align:center;color:#DC2626;font-size:13px;font-weight:700;margin-top:14px;min-height:20px}
+.lock-user{text-align:center;margin-top:16px;font-size:13px;color:#64748B;font-family:'Roboto',sans-serif}
+
+/* DELETE SHIFT BUTTON */
+.del-shift-btn{width:100%;margin-top:8px;background:#FFF5F5;border:2px solid #FECACA;color:#DC2626;padding:13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:'Exo 2',sans-serif;letter-spacing:.3px}
+.del-shift-btn:active{background:#FEE2E2}
+
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .3s}
 .modal-ov.show{opacity:1;pointer-events:all}
 .modal{background:#fff;border-top:3px solid var(--app);border-radius:20px 20px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s}
@@ -337,6 +393,37 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
 </style>
 </head>
 <body>
+
+<!-- PIN LOCK SCREEN -->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-logo">⛽ FUELDESK</div>
+  <div class="lock-sub">Authorised Access Only</div>
+  <div class="lock-card">
+    <div class="lock-title">Enter Your PIN</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-grid">
+      <div class="pin-btn" onclick="pinPress('1')">1</div>
+      <div class="pin-btn" onclick="pinPress('2')">2</div>
+      <div class="pin-btn" onclick="pinPress('3')">3</div>
+      <div class="pin-btn" onclick="pinPress('4')">4</div>
+      <div class="pin-btn" onclick="pinPress('5')">5</div>
+      <div class="pin-btn" onclick="pinPress('6')">6</div>
+      <div class="pin-btn" onclick="pinPress('7')">7</div>
+      <div class="pin-btn" onclick="pinPress('8')">8</div>
+      <div class="pin-btn" onclick="pinPress('9')">9</div>
+      <div class="pin-btn clear" onclick="pinClear()">⌫</div>
+      <div class="pin-btn" onclick="pinPress('0')">0</div>
+      <div class="pin-btn go" onclick="pinSubmit()">✓ GO</div>
+    </div>
+    <div class="lock-err" id="lockErr"></div>
+    <div class="lock-user" id="lockUser"></div>
+  </div>
+</div>
 
 <div class="hdr">
   <div class="hdr-icon">⛽</div>
@@ -573,7 +660,7 @@ let S = { rates:{ms:0,hsd:0,cng:0}, dsmList:[], dsm:'', selMPDs:[], selNozzles:{
 let eqrN=0, crN=0, oilN=0;
 let OIL_ITEMS=["MAK 4T PLUS 900 ML","MAK 4T SCOOTECH 800 ML","MAK ADBLUE 10 LTR","MAK ADBLUE 20 LTR","MAK BRAKE FLUID 250ML","MAK FLEET Ci4+ 210 LTR BARREL","MAK FLEET MINI Ci4+ 3 LTR","MAK GE 500 ML","MAK HONDA POWER 47 900ML","MAK HYDROL 68 210 LTR BARREL","MAK REDI KOOL 1 LTR","MAK SPIROL 85 5 LTR"];
 
-window.onload = ()=>{
+function initApp(){
   loadStorage();
   document.getElementById('saleDate').value = new Date().toISOString().split('T')[0];
   buildMPDGrid(); buildDenomRows(); renderRatePills(); addCredit();
@@ -581,6 +668,23 @@ window.onload = ()=>{
   localStorage.removeItem('fdp_shift'); localStorage.removeItem('fdp_cash_deps');
   purgeOldDSMLog();
   renderShiftLog();
+  // Show user name in header
+  if(currentUser){
+    const sub=document.querySelector('.hdr-sub');
+    if(sub)sub.textContent='👤 '+currentUser;
+  }
+}
+
+window.onload = ()=>{
+  // Check if already authenticated this session
+  const u=sessionStorage.getItem('fd_user'), p=sessionStorage.getItem('fd_pin');
+  if(u&&p){
+    checkAccess(p).then(r=>{
+      if(r.ok){ currentUser=r.name; document.getElementById('lockScreen').style.display='none'; initApp(); }
+      else { sessionStorage.clear(); }
+    });
+  }
+  // Otherwise show PIN screen (already visible by default)
 };
 
 function loadStorage(){
@@ -1166,8 +1270,16 @@ function closeShiftFinal(){
   renderShiftLog();
   showToast('🏁 Shift closed!');
 
-  // Sync to cloud
-  if(window._saveToCloud) window._saveToCloud(rec).catch(()=>{});
+  // Sync to cloud — store returned Firestore ID
+  if(window._saveToCloud){
+    window._saveToCloud(rec).then(fid=>{
+      if(fid){
+        const idx=S.shiftLog.length-1;
+        S.shiftLog[idx]._firestoreId=fid;
+        localStorage.setItem('fdp_shift',JSON.stringify(S.shiftLog));
+      }
+    }).catch(()=>{});
+  }
 
   // Show close summary inline
   showCloseResult(rec);
@@ -1331,6 +1443,10 @@ function renderShiftLog(){
     html+=`<div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--app);letter-spacing:1.5px;margin-bottom:10px">👤 ${dsmLabel}${ds?' · '+ds:''} — CURRENT SHIFT</div>`;
     html+=entryRows+totalCard;
     html+=`<button onclick="resetShift()" style="width:100%;margin-top:4px;background:#F1F5F9;border:1px solid var(--border);color:var(--muted);padding:13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">🔄 Start New Shift / New DSM</button>`;
+    // Delete last closed shift
+    if(S.shiftLog.length>0){
+      html+=`<button class="del-shift-btn" onclick="deleteLastShift()">🗑 Delete Last Closed Shift Entry</button>`;
+    }
   } else {
     html=`<div style="text-align:center;padding:30px 20px;color:var(--muted);background:#F8FAFC;border-radius:12px">
       <div style="font-size:40px;margin-bottom:10px">📋</div>
@@ -1469,6 +1585,88 @@ function toggleLogDay(i){
   const open=el.style.display==='none';
   el.style.display=open?'block':'none';
   if(arr)arr.textContent=open?'▲':'▼';
+}
+
+/* ═══════════ PIN ACCESS CONTROL ═══════════ */
+let pinEntry = '';
+
+function pinPress(d){
+  if(pinEntry.length>=4) return;
+  pinEntry += d;
+  updatePinDots();
+  if(pinEntry.length===4) setTimeout(pinSubmit, 200);
+}
+
+function pinClear(){
+  pinEntry = pinEntry.slice(0,-1);
+  updatePinDots();
+  document.getElementById('lockErr').textContent='';
+}
+
+function updatePinDots(){
+  for(let i=0;i<4;i++){
+    const dot=document.getElementById('pd'+i);
+    dot.classList.toggle('filled', i<pinEntry.length);
+    dot.classList.remove('error');
+  }
+}
+
+async function pinSubmit(){
+  if(pinEntry.length<4){document.getElementById('lockErr').textContent='Enter 4-digit PIN';return;}
+  document.getElementById('lockErr').textContent='Checking…';
+  const result = await checkAccess(pinEntry);
+  if(result.ok){
+    currentUser = result.name;
+    // Store session (clears on tab close)
+    sessionStorage.setItem('fd_user', result.name);
+    sessionStorage.setItem('fd_pin', pinEntry);
+    document.getElementById('lockScreen').style.display='none';
+    document.getElementById('lockUser').textContent='';
+    initApp();
+  } else {
+    document.getElementById('lockErr').textContent='❌ '+result.reason;
+    for(let i=0;i<4;i++) document.getElementById('pd'+i).classList.add('error');
+    setTimeout(()=>{ pinEntry=''; updatePinDots(); document.getElementById('lockErr').textContent=''; },1200);
+  }
+}
+
+function checkSession(){
+  const u=sessionStorage.getItem('fd_user'), p=sessionStorage.getItem('fd_pin');
+  if(u&&p){
+    // Re-verify against Firestore in background
+    checkAccess(p).then(r=>{
+      if(r.ok){ currentUser=r.name; document.getElementById('lockScreen').style.display='none'; initApp(); }
+      else { sessionStorage.clear(); }
+    });
+  }
+}
+
+/* ═══════════ DELETE CLOSED SHIFT ═══════════ */
+async function deleteLastShift(){
+  if(!S.shiftLog.length){showToast('No shift to delete','err');return;}
+  if(!confirm('Delete the last closed shift entry? This also removes it from the Master view.')) return;
+  const last = S.shiftLog[S.shiftLog.length-1];
+  // Delete from Firestore
+  if(last._firestoreId){
+    showToast('Deleting from cloud…');
+    const ok = await window._deleteFromCloud(last._firestoreId);
+    if(!ok) showToast('Cloud delete failed — try again','err');
+  }
+  // Remove from local shiftLog
+  S.shiftLog.pop();
+  localStorage.setItem('fdp_shift',JSON.stringify(S.shiftLog));
+  // Remove from allShifts archive too
+  if(S.allShifts.length){
+    S.allShifts[0].entries = S.shiftLog;
+    if(S.allShifts[0].entries.length===0) S.allShifts.shift();
+    localStorage.setItem('fdp_allshifts',JSON.stringify(S.allShifts));
+  }
+  // Remove from DSM log
+  const dsmlog=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  const updated=dsmlog.filter(r=>r.id!==last.id);
+  localStorage.setItem('fdp_dsmlog',JSON.stringify(updated));
+  renderShiftLog();
+  showToast('🗑 Shift entry deleted');
 }
 
 /* HELPERS */
