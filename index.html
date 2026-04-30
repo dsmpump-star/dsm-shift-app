@@ -1711,12 +1711,39 @@ function togglePastShift(idx){
   if(arrow)arrow.textContent=open?'▲':'▼';
 }
 
-function clearAllLocalData(){
-  if(!confirm('Clear ALL local shift data on this device?\n\nThis removes all shift logs, past shifts and cash data stored here. Firebase records are NOT deleted.')) return;
-  ['fdp_shift','fdp_allshifts','fdp_cash_deps','fdp_dsmlog'].forEach(k=>localStorage.removeItem(k));
-  S.shiftLog=[]; S.allShifts=[]; S.cashDeposits=[];
-  S.meters={}; S.dsm=''; S.selMPDs=[]; S.selNozzles=[];
-  document.getElementById('dsmSel').value='';
+async function clearAllLocalData(){
+  if(!confirm('Clear all shift data for '+S.dsm+'?\n\nThis removes their local data AND live cash entries from the cashier view. Other DSM data is not affected.')) return;
+
+  // Delete this DSM's live_cash entries from Firestore (so cashier view clears too)
+  try{
+    const today=document.getElementById('saleDate').value||new Date().toISOString().split('T')[0];
+    const snap=await db.collection('live_cash').where('dsm','==',S.dsm).where('date','==',today).get();
+    if(!snap.empty){
+      const batch=db.batch();
+      snap.docs.forEach(d=>batch.delete(d.ref));
+      await batch.commit();
+    }
+  }catch(e){ console.warn('Firestore clear failed',e); }
+
+  // Clear only this DSM's local records
+  const shift=JSON.parse(localStorage.getItem('fdp_shift')||'[]');
+  const newShift=shift.filter(r=>r.dsm!==S.dsm);
+  localStorage.setItem('fdp_shift',JSON.stringify(newShift));
+
+  const allShifts=JSON.parse(localStorage.getItem('fdp_allshifts')||'[]');
+  const newAll=allShifts.filter(a=>a.dsm!==S.dsm);
+  localStorage.setItem('fdp_allshifts',JSON.stringify(newAll));
+
+  const dsmlog=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  const newLog=dsmlog.filter(r=>r.dsm!==S.dsm);
+  localStorage.setItem('fdp_dsmlog',JSON.stringify(newLog));
+
+  localStorage.removeItem('fdp_cash_deps');
+
+  // Reset in-memory state for this DSM only
+  S.shiftLog=[]; S.allShifts=newAll; S.cashDeposits=[];
+  S.meters={}; S.selMPDs=[]; S.selNozzles=[];
+
   document.querySelectorAll('.mpd-card').forEach(b=>b.classList.remove('sel'));
   document.getElementById('ufill_a').value=''; document.getElementById('ppe_a').value='';
   for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
@@ -1726,12 +1753,12 @@ function clearAllLocalData(){
   for(let i=1;i<=testN;i++){const el=document.getElementById('test_'+i);if(el)el.remove();} testN=0;
   clearDenomInputs(); renderCashDepositLog(); calcPay();
   const mc=document.getElementById('metersCont'); if(mc)mc.innerHTML='';
-  document.getElementById('bdg_sh').textContent=''; document.getElementById('bdg_sh').classList.remove('show');
-  document.getElementById('bdg_m').classList.remove('show');
-  document.getElementById('bdg_p').classList.remove('show');
-  document.getElementById('bdg_c').classList.remove('show');
+  ['bdg_sh','bdg_m','bdg_p','bdg_c'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.textContent='';el.classList.remove('show');}
+  });
   renderShiftLog(); showTab('setup');
-  showToast('✅ All local data cleared');
+  showToast('✅ '+S.dsm+' data cleared');
 }
 
 function resetShift(){
