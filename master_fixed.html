@@ -19,51 +19,69 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-let currentListener = null;
-let allRecords = [];
-let knownDSMs = [];
-let activeDSM = '';
+
+let currentListener = null;  // closed shifts
+let cashListener    = null;  // live cash deposits
+let allRecords  = [];
+let liveCashRecs= [];        // deposits from live_cash collection
+let knownDSMs   = [];
+let activeDSM   = '';
 
 function startListen(dateFilter, dsmFilter){
-  const cont = document.getElementById('mainContent');
-  // Require BOTH date and DSM to be selected
   if(!dateFilter || !dsmFilter){
-    if(currentListener){ currentListener(); currentListener=null; }
-    allRecords=[];
-    if(!dateFilter && !dsmFilter){
-      cont.innerHTML=`<div class="empty"><div class="empty-ico">📅</div><div class="empty-msg">Select a date first</div><div class="empty-sub">Then tap a DSM chip to load their data</div></div>`;
-    } else if(!dsmFilter){
-      cont.innerHTML=`<div class="empty"><div class="empty-ico">👤</div><div class="empty-msg">Now select a DSM</div><div class="empty-sub">Tap one of the DSM chips above</div></div>`;
-    }
-    setStatus('⏸ Waiting for selection');
-    return;
+    stopAll(); allRecords=[]; liveCashRecs=[];
+    if(!dateFilter) showNeedDate(); else showNeedDSM();
+    setStatus('⏸ Waiting for selection'); return;
   }
   setStatus('🔄 Loading '+dsmFilter+'…');
-  if(currentListener) currentListener();
-  // Query ONLY this DSM on this date — strict filter
-  let q = db.collection('dsm_records')
-    .where('date','==',dateFilter)
-    .where('dsm','==',dsmFilter);
-  currentListener = q.onSnapshot(snap=>{
-    const recs = snap.docs.map(d=>({...d.data(),_id:d.id}));
-    allRecords = recs;
-    setStatus('✅ Live · '+recs.length+' record(s) · '+dsmFilter);
-    renderAll(recs, dsmFilter);
-  }, ()=>setStatus('❌ Connection error'));
+  stopAll();
+
+  // Listener 1 — closed shift records
+  currentListener = db.collection('dsm_records')
+    .where('date','==',dateFilter).where('dsm','==',dsmFilter)
+    .onSnapshot(snap=>{
+      allRecords = snap.docs.map(d=>({...d.data(),_id:d.id}));
+      setStatus('✅ Live · '+dsmFilter);
+      renderAll();
+    }, ()=>setStatus('❌ Connection error'));
+
+  // Listener 2 — live cash deposits (real-time, before shift close)
+  cashListener = db.collection('live_cash')
+    .where('date','==',dateFilter).where('dsm','==',dsmFilter)
+    .onSnapshot(snap=>{
+      liveCashRecs = snap.docs.map(d=>({...d.data(),_id:d.id}))
+        .sort((a,b)=>((a.savedAt?.seconds||0)-(b.savedAt?.seconds||0)));
+      renderAll();
+    }, ()=>{
+      // Fallback without ordering if index missing
+      db.collection('live_cash')
+        .where('date','==',dateFilter).where('dsm','==',dsmFilter)
+        .get().then(snap=>{
+          liveCashRecs=snap.docs.map(d=>d.data());
+          renderAll();
+        }).catch(()=>{});
+    });
+}
+
+function stopAll(){
+  if(currentListener){currentListener();currentListener=null;}
+  if(cashListener){cashListener();cashListener=null;}
 }
 
 function loadDSMNames(dateFilter){
-  let q = db.collection('dsm_records');
-  if(dateFilter) q = q.where('date','==',dateFilter);
-  q.get().then(snap=>{
-    knownDSMs = [...new Set(snap.docs.map(d=>d.data().dsm||'').filter(Boolean))].sort();
-    rebuildChips(activeDSM);
-  }).catch(()=>{});
+  const names=new Set();
+  const p1=db.collection('dsm_records').where('date','==',dateFilter).get()
+    .then(s=>s.docs.forEach(d=>{if(d.data().dsm)names.add(d.data().dsm)})).catch(()=>{});
+  const p2=db.collection('live_cash').where('date','==',dateFilter).get()
+    .then(s=>s.docs.forEach(d=>{if(d.data().dsm)names.add(d.data().dsm)})).catch(()=>{});
+  Promise.all([p1,p2]).then(()=>{
+    knownDSMs=[...names].sort(); rebuildChips(activeDSM);
+  });
 }
 
 function setStatus(m){
-  document.getElementById('syncStatus').textContent = m;
-  document.getElementById('lastSync').textContent = 'Updated '+new Date().toLocaleTimeString('en-IN');
+  document.getElementById('syncStatus').textContent=m;
+  document.getElementById('lastSync').textContent='Updated '+new Date().toLocaleTimeString('en-IN');
 }
 </script>
 <style>
@@ -263,9 +281,8 @@ function fmt(n){return(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,max
 function onDateChange(){
   const d=document.getElementById('dateFilter').value;
   if(!d)return;
-  activeDSM=''; // reset DSM selection when date changes
-  if(currentListener){currentListener();currentListener=null;}
-  allRecords=[];
+  activeDSM='';
+  stopAll(); allRecords=[]; liveCashRecs=[];
   loadDSMNames(d);
   showNeedDSM();
 }
@@ -274,8 +291,7 @@ function loadToday(){
   const t=new Date().toISOString().split('T')[0];
   document.getElementById('dateFilter').value=t;
   activeDSM='';
-  if(currentListener){currentListener();currentListener=null;}
-  allRecords=[];
+  stopAll(); allRecords=[]; liveCashRecs=[];
   loadDSMNames(t);
   showNeedDSM();
 }
@@ -316,158 +332,161 @@ function rebuildChips(selected){
   });
 }
 
-function renderAll(recs, dsmFilter){
+function renderAll(){
   const cont=document.getElementById('mainContent');
-  const list=dsmFilter?recs.filter(r=>r.dsm===dsmFilter):recs;
+  const dv=document.getElementById('dateFilter').value;
+  const dateStr=dv?new Date(dv).toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'';
+  const liveCashTotal=liveCashRecs.reduce((s,d)=>s+(d.total||0),0);
+  const hasClosedShifts=allRecords.length>0;
+  const livePanel=buildLiveCashPanel(activeDSM,liveCashRecs,liveCashTotal,hasClosedShifts);
 
-  if(!list.length){
-    cont.innerHTML=`<div class="empty"><div class="empty-ico">📋</div><div class="empty-msg">${dsmFilter?'No data for '+dsmFilter:'No records for this date'}</div><div class="empty-sub">Records appear once DSMs close their shifts</div></div>`;
+  // Mid-shift — no closed shift yet, show live cash only
+  if(!hasClosedShifts){
+    cont.innerHTML=`
+      <div style="font-family:'Orbitron',monospace;font-size:9px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">📅 ${dateStr}</div>
+      <div class="dsm-banner">
+        <div>
+          <div class="dsm-banner-name">👤 ${activeDSM}</div>
+          <div class="dsm-banner-meta">Shift in progress — not yet closed</div>
+        </div>
+        <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;text-align:center">
+          <div style="font-size:9px;opacity:.6;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px">Cash Received So Far</div>
+          <div style="font-family:'Roboto',sans-serif;font-size:22px;font-weight:900">₹ ${fmt(liveCashTotal)}</div>
+        </div>
+      </div>
+      ${livePanel}`;
     return;
   }
 
-  // Group by DSM
-  const groups={};
-  list.forEach(r=>{
-    const k=r.dsm||'Unknown';
-    if(!groups[k]) groups[k]={dsm:k,date:r.date||'',entries:[]};
-    groups[k].entries.push(r);
-  });
-  Object.values(groups).forEach(g=>g.entries.sort((a,b)=>(a.id||0)-(b.id||0)));
+  // Post-close — full view
+  const e=allRecords;
+  const sG =e.reduce((s,r)=>s+(r.totalGross||0),0);
+  const sQ =e.reduce((s,r)=>s+(r.qrTotal||0),0);
+  const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
+  const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
+  const sTest=e.reduce((s,r)=>s+(r.testTotal||0),0);
+  const sN=e.reduce((s,r)=>s+(r.cashSales||0),0);
+  const sC=e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0);
+  const sD=sC-sN;
+  const isOver=sD>0.01,isShort=sD<-0.01,isBal=!isOver&&!isShort;
+  const cls=isOver?'green':isShort?'red':'bal';
+  const statusTxt=isBal?'✅ BALANCED':isOver?'⬆ CASH OVER':'⬇ CASH SHORT';
+  const statusDesc=isBal?'Cash matches sales':isOver?`Extra ₹${fmt(Math.abs(sD))} received`:`Short by ₹${fmt(Math.abs(sD))}`;
+  const ds=e[0]?.date?new Date(e[0].date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
 
-  const dv=document.getElementById('dateFilter').value;
-  const dateStr=dv?new Date(dv).toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'All Dates';
-  const groupArr=Object.values(groups);
-  let html=`<div style="font-family:'Orbitron',monospace;font-size:9px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">📅 ${dateStr}</div>`;
+  let html=`<div style="font-family:'Orbitron',monospace;font-size:9px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">📅 ${dateStr}</div>`;
+  html+=`<div class="dsm-banner">
+    <div><div class="dsm-banner-name">👤 ${activeDSM}</div><div class="dsm-banner-meta">${ds} · ${e.length} shift${e.length>1?'s':''} closed</div></div>
+    <div class="dsm-banner-right"><div class="dsm-banner-gross-lbl">Gross Sales</div><div class="dsm-banner-gross">₹ ${fmt(sG)}</div></div>
+  </div>`;
 
-  groupArr.forEach((g,gi)=>{
-    const e=g.entries;
-    const sG =e.reduce((s,r)=>s+(r.totalGross||0),0);
-    const sQ =e.reduce((s,r)=>s+(r.qrTotal||0),0);
-    const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
-    const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
-    const sTest=e.reduce((s,r)=>s+(r.testTotal||0),0);
-    const sN =e.reduce((s,r)=>s+(r.cashSales||0),0);   // net cash EXPECTED
-    const sC =e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0); // cash RECEIVED
-    const sD =sC-sN;   // + = over (green), - = short (red)
+  // Live cash panel first — cashier sees all deposits
+  html+=livePanel;
 
-    const isOver=sD>0.01, isShort=sD<-0.01, isBal=!isOver&&!isShort;
-    const cls=isOver?'green':isShort?'red':'bal';
-    const statusTxt=isBal?'✅ BALANCED':isOver?'⬆ CASH OVER':'⬇ CASH SHORT';
-    const statusDesc=isBal?'Cash exactly matches sales':isOver?`DSM gave ₹${fmt(Math.abs(sD))} extra`:`DSM is short by ₹${fmt(Math.abs(sD))}`;
-
-    const ds=g.date?new Date(g.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
-
-    // ── DSM BANNER ──
-    html+=`<div class="dsm-banner">
-      <div>
-        <div class="dsm-banner-name">👤 ${g.dsm}</div>
-        <div class="dsm-banner-meta">${ds} · ${e.length} shift${e.length>1?'s':''}</div>
+  // Sales vs Cash
+  html+=`<div class="svc ${cls}">
+    <div class="svc-top"><div class="svc-top-lbl">💰 SALES vs CASH RECEIVED</div><div class="svc-badge">${statusTxt}</div></div>
+    <div class="svc-body">
+      <div class="svc-cols">
+        <div class="svc-col expected">
+          <div class="svc-col-lbl">Net Cash Expected</div>
+          <div class="svc-col-val">₹ ${fmt(sN)}</div>
+          <div class="svc-col-sub">Gross ₹${fmt(sG)}<br>− QR ₹${fmt(sQ)}${sCr>0?'<br>− Credits ₹'+fmt(sCr):''}${sTest>0?'<br>− Testing ₹'+fmt(sTest):''}${sOil>0?'<br>+ Oil ₹'+fmt(sOil):''}</div>
+        </div>
+        <div class="svc-col received">
+          <div class="svc-col-lbl">Cash Received</div>
+          <div class="svc-col-val">₹ ${fmt(sC)}</div>
+          <div class="svc-col-sub">${e.reduce((s,r)=>s+(Array.isArray(r.denomData)?r.denomData.length:0),0)} deposit(s) total</div>
+        </div>
       </div>
-      <div class="dsm-banner-right">
-        <div class="dsm-banner-gross-lbl">Gross Sales</div>
-        <div class="dsm-banner-gross">₹ ${fmt(sG)}</div>
+      <div class="diff-big ${cls}">
+        <div class="diff-big-lbl">${isBal?'PERFECTLY BALANCED':isOver?'CASH OVER BY':'CASH SHORT BY'}</div>
+        <div class="diff-big-val">${isOver?'+ ':''}₹ ${fmt(Math.abs(sD))}</div>
+        <div class="diff-big-msg">${statusDesc}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // KPI strip
+  html+=`<div class="kpis">
+    <div class="kpi kb"><div class="kpi-lbl">Gross Sales</div><div class="kpi-val">₹ ${fmt(sG)}</div><div class="kpi-sub">${e.reduce((s,r)=>s+(r.totalLtr||0),0).toFixed(2)} L</div></div>
+    <div class="kpi kp"><div class="kpi-lbl">QR / UPI</div><div class="kpi-val">₹ ${fmt(sQ)}</div><div class="kpi-sub">Digital</div></div>
+    ${sTest>0?`<div class="kpi" style="border-top-color:#0369A1"><div class="kpi-lbl">🧪 Testing</div><div class="kpi-val" style="color:#0369A1">₹ ${fmt(sTest)}</div><div class="kpi-sub">Deducted</div></div>`:''}
+    ${sOil>0?`<div class="kpi" style="border-top-color:#C2410C"><div class="kpi-lbl">🛢️ Oil</div><div class="kpi-val" style="color:#C2410C">₹ ${fmt(sOil)}</div><div class="kpi-sub">Added</div></div>`:''}
+    <div class="kpi kg"><div class="kpi-lbl">Net Expected</div><div class="kpi-val">₹ ${fmt(sN)}</div><div class="kpi-sub">After deductions</div></div>
+    <div class="kpi ka"><div class="kpi-lbl">Cash Deposited</div><div class="kpi-val">₹ ${fmt(sC)}</div><div class="kpi-sub">By DSM</div></div>
+  </div>`;
+
+  // Shift-wise
+  html+=`<div class="sec-lbl">Shift-wise breakdown · ${e.length} shift${e.length>1?'s':''}</div>`;
+  e.forEach((r,i)=>{
+    const cash=r.cashDeposited||r.cashInHand||0, exp=r.cashSales||0, d=cash-exp;
+    const ov=d>0.01,sh=d<-0.01,bl=!ov&&!sh;
+    const sc=ov?'green':sh?'red':'bal';
+    const pt=bl?'✅ Match':ov?`⬆ Over ₹${fmt(Math.abs(d))}`:`⬇ Short ₹${fmt(Math.abs(d))}`;
+    const deposits=Array.isArray(r.denomData)?r.denomData:[];
+    const cashLog=deposits.length?`<div class="cash-log"><div class="cash-log-hdr">💰 Cash Deposits (${deposits.length})</div>${deposits.map(dep=>`<div class="cash-log-row"><span class="cl-ts">🕐 ${dep.ts||'—'}</span><span class="cl-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}</div>`:'';
+    html+=`<div class="shift-card">
+      <div class="shift-hdr" onclick="tog('sb_${i}','sa_${i}')">
+        <div><div class="shift-num">SHIFT ${i+1}</div><div class="shift-time">🕐 ${r.savedTime||'—'} · ${(r.mpds||[]).join('+')||'—'}</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="dpill ${sc}">${pt}</span>
+          <span id="sa_${i}" style="color:#94A3B8;font-size:11px">▼</span>
+        </div>
+      </div>
+      <div id="sb_${i}" style="display:none">
+        <div class="shift-body">
+          <div class="mini-svc">
+            <div class="mini-box exp"><div class="mini-box-lbl">Expected Cash</div><div class="mini-box-val">₹ ${fmt(exp)}</div></div>
+            <div class="mini-box rec"><div class="mini-box-lbl">Cash Received</div><div class="mini-box-val">₹ ${fmt(cash)}</div></div>
+          </div>
+          <div class="s-row"><span class="s-lbl">Gross Sales</span><span class="s-val" style="color:#1E6B8E">₹ ${fmt(r.totalGross)}</span></div>
+          <div class="s-row"><span class="s-lbl">Total Litres</span><span class="s-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
+          <div class="s-row"><span class="s-lbl">QR / UPI</span><span class="s-val" style="color:#6D28D9">− ₹ ${fmt(r.qrTotal)}</span></div>
+          ${(r.creditTotal||0)>0?`<div class="s-row"><span class="s-lbl">Credits</span><span class="s-val" style="color:#B91C1C">− ₹ ${fmt(r.creditTotal)}</span></div>`:''}
+          ${(r.testTotal||0)>0?`<div class="s-row"><span class="s-lbl">🧪 Testing</span><span class="s-val" style="color:#0369A1">− ₹ ${fmt(r.testTotal)}</span></div>`:''}
+          ${(r.oilTotal||0)>0?`<div class="s-row"><span class="s-lbl">🛢️ Oil Cash</span><span class="s-val" style="color:#C2410C">+ ₹ ${fmt(r.oilTotal)}</span></div>`:''}
+          <div class="s-row" style="border-top:2px solid #E2E8F0;margin-top:4px;padding-top:10px">
+            <span class="s-lbl" style="font-size:14px;font-weight:800;color:#166534">NET EXPECTED</span>
+            <span class="s-val" style="font-size:15px;color:#166534">₹ ${fmt(exp)}</span>
+          </div>
+          ${cashLog}
+          <div class="s-row"><span class="s-lbl" style="font-weight:800">DEPOSITED</span><span class="s-val" style="color:#92400E;font-size:15px">₹ ${fmt(cash)}</span></div>
+          <div class="sdiff ${sc}"><div class="sdiff-val">${ov?'+ ':''}₹ ${fmt(Math.abs(d))}</div><div class="sdiff-lbl">${pt}</div></div>
+        </div>
       </div>
     </div>`;
-
-    // ── SALES vs CASH MAIN CARD ──
-    html+=`<div class="svc ${cls}">
-      <div class="svc-top">
-        <div class="svc-top-lbl">💰 SALES vs CASH RECEIVED</div>
-        <div class="svc-badge">${statusTxt}</div>
-      </div>
-      <div class="svc-body">
-        <div class="svc-cols">
-          <div class="svc-col expected">
-            <div class="svc-col-lbl">Net Cash Expected</div>
-            <div class="svc-col-val">₹ ${fmt(sN)}</div>
-            <div class="svc-col-sub">Gross ₹${fmt(sG)}<br>− QR ₹${fmt(sQ)}${sCr>0?'<br>− Credits ₹'+fmt(sCr):''}${sTest>0?'<br>− Testing ₹'+fmt(sTest):''}${sOil>0?'<br>+ Oil ₹'+fmt(sOil):''}</div>
-          </div>
-          <div class="svc-col received">
-            <div class="svc-col-lbl">Cash Received</div>
-            <div class="svc-col-val">₹ ${fmt(sC)}</div>
-            <div class="svc-col-sub">Deposited by DSM<br>${e.reduce((s,r)=>s+(Array.isArray(r.denomData)?r.denomData.length:0),0)} deposit entry(s)</div>
-          </div>
-        </div>
-        <div class="diff-big ${cls}">
-          <div class="diff-big-lbl">${isBal?'PERFECTLY BALANCED':isOver?'CASH OVER BY':'CASH SHORT BY'}</div>
-          <div class="diff-big-val">${isOver?'+ ':''}₹ ${fmt(Math.abs(sD))}</div>
-          <div class="diff-big-msg">${statusDesc}</div>
-        </div>
-      </div>
-    </div>`;
-
-    // ── KPI STRIP ──
-    html+=`<div class="kpis">
-      <div class="kpi kb"><div class="kpi-lbl">Gross Sales</div><div class="kpi-val">₹ ${fmt(sG)}</div><div class="kpi-sub">${e.reduce((s,r)=>s+(r.totalLtr||0),0).toFixed(2)} L</div></div>
-      <div class="kpi kp"><div class="kpi-lbl">QR / UPI</div><div class="kpi-val">₹ ${fmt(sQ)}</div><div class="kpi-sub">Digital</div></div>
-      <div class="kpi kg"><div class="kpi-lbl">Net Expected</div><div class="kpi-val">₹ ${fmt(sN)}</div><div class="kpi-sub">After deductions</div></div>
-      <div class="kpi ka"><div class="kpi-lbl">Cash Deposited</div><div class="kpi-val">₹ ${fmt(sC)}</div><div class="kpi-sub">By DSM</div></div>
-    </div>`;
-
-    // ── SHIFT-WISE ──
-    html+=`<div class="sec-lbl">Shift-wise breakdown · ${e.length} shift${e.length>1?'s':''}</div>`;
-    e.forEach((r,i)=>{
-      const cash=r.cashDeposited||r.cashInHand||0;
-      const exp=r.cashSales||0;
-      const d=cash-exp;
-      const ov=d>0.01,sh=d<-0.01,bl=!ov&&!sh;
-      const sc=ov?'green':sh?'red':'bal';
-      const pt=bl?'✅ Match':ov?`⬆ Over ₹${fmt(Math.abs(d))}`:`⬇ Short ₹${fmt(Math.abs(d))}`;
-      const deposits=Array.isArray(r.denomData)?r.denomData:[];
-      const cashLog=deposits.length?`<div class="cash-log">
-        <div class="cash-log-hdr">💰 Cash Deposits (${deposits.length})</div>
-        ${deposits.map(dep=>`<div class="cash-log-row"><span class="cl-ts">🕐 ${dep.ts||'—'}</span><span class="cl-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}
-      </div>`:'';
-      const testLine=(r.testTotal||0)>0?`<div class="s-row"><span class="s-lbl">🧪 Testing Deducted</span><span class="s-val" style="color:#0369A1">− ₹ ${fmt(r.testTotal)}</span></div>`:'';
-
-      html+=`<div class="shift-card">
-        <div class="shift-hdr" onclick="tog('sb_${gi}_${i}','sa_${gi}_${i}')">
-          <div>
-            <div class="shift-num">SHIFT ${i+1}</div>
-            <div class="shift-time">🕐 ${r.savedTime||'—'} · ${(r.mpds||[]).join('+')||'—'}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="dpill ${sc}">${pt}</span>
-            <span id="sa_${gi}_${i}" style="color:#94A3B8;font-size:11px">▼</span>
-          </div>
-        </div>
-        <div id="sb_${gi}_${i}" style="display:none">
-          <div class="shift-body">
-            <div class="mini-svc">
-              <div class="mini-box exp">
-                <div class="mini-box-lbl">Expected Cash</div>
-                <div class="mini-box-val">₹ ${fmt(exp)}</div>
-              </div>
-              <div class="mini-box rec">
-                <div class="mini-box-lbl">Cash Received</div>
-                <div class="mini-box-val">₹ ${fmt(cash)}</div>
-              </div>
-            </div>
-            <div class="s-row"><span class="s-lbl">Gross Sales</span><span class="s-val" style="color:#1E6B8E">₹ ${fmt(r.totalGross)}</span></div>
-            <div class="s-row"><span class="s-lbl">Total Litres</span><span class="s-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
-            <div class="s-row"><span class="s-lbl">QR / UPI</span><span class="s-val" style="color:#6D28D9">− ₹ ${fmt(r.qrTotal)}</span></div>
-            ${(r.creditTotal||0)>0?`<div class="s-row"><span class="s-lbl">Credits</span><span class="s-val" style="color:#B91C1C">− ₹ ${fmt(r.creditTotal)}</span></div>`:''}
-            ${testLine}
-            ${(r.oilTotal||0)>0?`<div class="s-row"><span class="s-lbl">🛢️ Oil Cash</span><span class="s-val" style="color:#C2410C">+ ₹ ${fmt(r.oilTotal)}</span></div>`:''}
-            <div class="s-row" style="border-top:2px solid #E2E8F0;margin-top:4px;padding-top:10px">
-              <span class="s-lbl" style="font-size:14px;font-weight:800;color:#166534">NET EXPECTED</span>
-              <span class="s-val" style="font-size:15px;color:#166534">₹ ${fmt(exp)}</span>
-            </div>
-            ${cashLog}
-            <div class="s-row"><span class="s-lbl" style="font-weight:800">DEPOSITED</span><span class="s-val" style="color:#92400E;font-size:15px">₹ ${fmt(cash)}</span></div>
-            <div class="sdiff ${sc}">
-              <div class="sdiff-val">${ov?'+ ':''}₹ ${fmt(Math.abs(d))}</div>
-              <div class="sdiff-lbl">${pt}</div>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    });
-
-    if(gi<groupArr.length-1) html+=`<hr style="border:none;border-top:2px dashed #E2E8F0;margin:24px 0">`;
   });
 
   cont.innerHTML=html;
+}
+
+/* ── LIVE CASH PANEL ── */
+function buildLiveCashPanel(dsm, deposits, total, isPostClose){
+  if(!deposits.length && !isPostClose) return `
+    <div style="background:#FFFBEB;border:2px dashed #FCD34D;border-radius:12px;padding:18px;text-align:center;margin-bottom:16px">
+      <div style="font-size:24px;margin-bottom:6px">💰</div>
+      <div style="font-size:13px;font-weight:700;color:#92400E">Waiting for cash deposits…</div>
+      <div style="font-size:11px;color:#B45309;margin-top:4px">DSM hasn't deposited any cash yet today</div>
+    </div>`;
+  if(!deposits.length) return '';
+  const badge=isPostClose
+    ?`<span style="background:#166534;color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">SHIFT CLOSED</span>`
+    :`<span style="background:#F59E0B;color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">● LIVE</span>`;
+  return `<div style="background:#fff;border:2px solid #FCD34D;border-radius:12px;margin-bottom:16px;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:#FEF3C7;border-bottom:2px solid #FCD34D">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;font-weight:900;color:#92400E;letter-spacing:1.5px">💰 CASH DEPOSITS — ${deposits.length} ENTR${deposits.length>1?'IES':'Y'}</div>
+      ${badge}
+    </div>
+    ${deposits.map(d=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid #FEF3C7">
+      <span style="font-family:'Roboto',sans-serif;font-size:12px;color:#78350F">🕐 ${d.ts||'—'}</span>
+      <span style="font-family:'Roboto',sans-serif;font-size:15px;font-weight:800;color:#92400E">₹ ${fmt(d.total)}</span>
+    </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#FFFBEB">
+      <span style="font-size:12px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.5px">Total Cash Received</span>
+      <span style="font-family:'Roboto',sans-serif;font-size:22px;font-weight:900;color:#92400E">₹ ${fmt(total)}</span>
+    </div>
+  </div>`;
 }
 
 function tog(bid,aid){
