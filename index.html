@@ -2049,8 +2049,17 @@ async function deleteLastShift(){
 
 /* ═══════════ ADMIN PANEL ═══════════ */
 function initAdmin(){
-  document.getElementById('adminScreen').style.display='flex';
+  // Hide entire DSM app UI
+  document.querySelector('.hdr').style.display='none';
+  document.querySelector('.tabs').style.display='none';
+  document.getElementById('mainScroll').style.display='none';
+
+  // Show admin screen
+  const adm=document.getElementById('adminScreen');
+  adm.style.display='flex';
   document.getElementById('adminSubHdr').textContent='👑 '+currentUser+' — Master';
+
+  // Load saved rates
   const s=JSON.parse(localStorage.getItem('fdp_s')||'{}');
   const rates=s.rates||{ms:0,hsd:0,cng:0};
   if(rates.ms) document.getElementById('adm_r_ms').value=rates.ms;
@@ -2060,10 +2069,16 @@ function initAdmin(){
 }
 
 function adminLogout(){
-  sessionStorage.clear();
+  // Restore DSM app elements
+  document.querySelector('.hdr').style.display='';
+  document.querySelector('.tabs').style.display='';
+  document.getElementById('mainScroll').style.display='';
   document.getElementById('adminScreen').style.display='none';
+  // Clear session and show PIN screen
+  sessionStorage.clear();
   document.getElementById('lockScreen').style.display='flex';
   pinEntry=''; updatePinDots();
+  document.getElementById('lockErr').textContent='';
 }
 
 async function adminLoadDSMs(){
