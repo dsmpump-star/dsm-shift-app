@@ -345,6 +345,7 @@ function renderAll(recs, dsmFilter){
     const sQ =e.reduce((s,r)=>s+(r.qrTotal||0),0);
     const sCr=e.reduce((s,r)=>s+(r.creditTotal||0),0);
     const sOil=e.reduce((s,r)=>s+(r.oilTotal||0),0);
+    const sTest=e.reduce((s,r)=>s+(r.testTotal||0),0);
     const sN =e.reduce((s,r)=>s+(r.cashSales||0),0);   // net cash EXPECTED
     const sC =e.reduce((s,r)=>s+(r.cashDeposited||r.cashInHand||0),0); // cash RECEIVED
     const sD =sC-sN;   // + = over (green), - = short (red)
@@ -379,7 +380,7 @@ function renderAll(recs, dsmFilter){
           <div class="svc-col expected">
             <div class="svc-col-lbl">Net Cash Expected</div>
             <div class="svc-col-val">₹ ${fmt(sN)}</div>
-            <div class="svc-col-sub">Gross ₹${fmt(sG)}<br>− QR ₹${fmt(sQ)}${sCr>0?'<br>− Credits ₹'+fmt(sCr):''}${sOil>0?'<br>+ Oil ₹'+fmt(sOil):''}</div>
+            <div class="svc-col-sub">Gross ₹${fmt(sG)}<br>− QR ₹${fmt(sQ)}${sCr>0?'<br>− Credits ₹'+fmt(sCr):''}${sTest>0?'<br>− Testing ₹'+fmt(sTest):''}${sOil>0?'<br>+ Oil ₹'+fmt(sOil):''}</div>
           </div>
           <div class="svc-col received">
             <div class="svc-col-lbl">Cash Received</div>
@@ -417,6 +418,7 @@ function renderAll(recs, dsmFilter){
         <div class="cash-log-hdr">💰 Cash Deposits (${deposits.length})</div>
         ${deposits.map(dep=>`<div class="cash-log-row"><span class="cl-ts">🕐 ${dep.ts||'—'}</span><span class="cl-amt">₹ ${fmt(dep.total)}</span></div>`).join('')}
       </div>`:'';
+      const testLine=(r.testTotal||0)>0?`<div class="s-row"><span class="s-lbl">🧪 Testing Deducted</span><span class="s-val" style="color:#0369A1">− ₹ ${fmt(r.testTotal)}</span></div>`:'';
 
       html+=`<div class="shift-card">
         <div class="shift-hdr" onclick="tog('sb_${gi}_${i}','sa_${gi}_${i}')">
@@ -445,6 +447,7 @@ function renderAll(recs, dsmFilter){
             <div class="s-row"><span class="s-lbl">Total Litres</span><span class="s-val">${(r.totalLtr||0).toFixed(3)} L</span></div>
             <div class="s-row"><span class="s-lbl">QR / UPI</span><span class="s-val" style="color:#6D28D9">− ₹ ${fmt(r.qrTotal)}</span></div>
             ${(r.creditTotal||0)>0?`<div class="s-row"><span class="s-lbl">Credits</span><span class="s-val" style="color:#B91C1C">− ₹ ${fmt(r.creditTotal)}</span></div>`:''}
+            ${testLine}
             ${(r.oilTotal||0)>0?`<div class="s-row"><span class="s-lbl">🛢️ Oil Cash</span><span class="s-val" style="color:#C2410C">+ ₹ ${fmt(r.oilTotal)}</span></div>`:''}
             <div class="s-row" style="border-top:2px solid #E2E8F0;margin-top:4px;padding-top:10px">
               <span class="s-lbl" style="font-size:14px;font-weight:800;color:#166534">NET EXPECTED</span>

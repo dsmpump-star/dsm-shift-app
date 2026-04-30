@@ -545,10 +545,18 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
     </div>
   </div>
   <div class="card">
+    <div class="ch" style="background:linear-gradient(135deg,#F0F9FF,#E0F2FE);color:#0369A1;border-color:#7DD3FC">🧪 Testing</div>
+    <div class="cb">
+      <div id="testingList"></div>
+      <button class="add-btn" style="background:#F0F9FF;color:#0369A1;border-color:#7DD3FC" onclick="addTestingRow()">+ Add Testing Entry</button>
+    </div>
+  </div>
+  <div class="card">
     <div class="ch red">📋 Payment Totals</div>
     <div class="cb">
       <div class="rrow"><span class="rl">Total QR / UPI</span><span class="rv" style="color:#6D28D9" id="tot_qr">₹ 0.00</span></div>
       <div class="rrow"><span class="rl">Total Credits</span><span class="rv" style="color:#B91C1C" id="tot_cr">₹ 0.00</span></div>
+      <div class="rrow"><span class="rl">🧪 Testing</span><span class="rv" style="color:#0369A1" id="tot_test">₹ 0.00</span></div>
       <div class="rrow"><span class="rl">🛢️ Oil Cash Sales</span><span class="rv" style="color:#C2410C" id="tot_oil">₹ 0.00</span></div>
       <div class="rrow"><span class="rl">Total Deductions</span><span class="rv" style="color:#DC2626" id="tot_ded">₹ 0.00</span></div>
     </div>
@@ -1041,6 +1049,73 @@ function addCredit(){
   document.getElementById('creditList').appendChild(d);
 }
 
+/* TESTING */
+let testN=0;
+function addTestingRow(){
+  testN++;const id=testN;
+  const d=document.createElement('div');
+  d.style.cssText='background:#F0F9FF;border:1px solid #7DD3FC;border-radius:10px;padding:12px;margin-bottom:8px';
+  d.id='test_'+id;
+  d.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#0369A1;text-transform:uppercase">🧪 Testing #${id}</div>
+    <button class="rm-btn" onclick="rmEl('test_${id}');calcPay()">✕</button>
+  </div>
+  <div class="row2" style="margin-bottom:8px">
+    <div class="field" style="margin:0">
+      <label>Fuel Type</label>
+      <select id="test_${id}_f" onchange="calcTestAmt(${id})" style="background:#fff;border:1.5px solid #7DD3FC;color:#0369A1;font-family:'Exo 2',sans-serif;font-size:14px;font-weight:700;padding:9px 12px;border-radius:8px;outline:none;width:100%">
+        <option value="ms">MS · Petrol</option>
+        <option value="hsd">HSD · Diesel</option>
+        <option value="cng">CNG</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0">
+      <label>Litres</label>
+      <input type="number" id="test_${id}_l" placeholder="0.000" step="0.001" inputmode="decimal"
+        style="background:#fff;border:1.5px solid #7DD3FC;border-radius:8px;font-family:'Roboto',sans-serif;font-size:16px;font-weight:700;padding:9px 12px;width:100%;outline:none"
+        oninput="calcTestAmt(${id})">
+    </div>
+  </div>
+  <div style="background:#fff;border:1.5px solid #7DD3FC;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:11px;font-weight:800;color:#0369A1;letter-spacing:.5px">Testing Amount</span>
+    <span style="font-family:'Roboto',sans-serif;font-size:17px;font-weight:900;color:#0369A1" id="test_${id}_amt">₹ 0.00</span>
+  </div>`;
+  document.getElementById('testingList').appendChild(d);
+}
+
+function calcTestAmt(id){
+  const fuel=document.getElementById('test_'+id+'_f')?.value||'ms';
+  const ltr=parseFloat(document.getElementById('test_'+id+'_l')?.value)||0;
+  const rate=S.rates[fuel]||0;
+  const amt=ltr*rate;
+  const el=document.getElementById('test_'+id+'_amt');
+  if(el) el.textContent='₹ '+fmt(amt)+' @ ₹'+rate+'/L';
+  calcPay();
+}
+
+function getTestTot(){
+  let t=0;
+  for(let i=1;i<=testN;i++){
+    const f=document.getElementById('test_'+i+'_f');if(!f)continue;
+    const ltr=parseFloat(document.getElementById('test_'+i+'_l')?.value)||0;
+    const rate=S.rates[f.value]||0;
+    t+=ltr*rate;
+  }
+  return t;
+}
+
+function getTestData(){
+  const a=[];
+  for(let i=1;i<=testN;i++){
+    const f=document.getElementById('test_'+i+'_f');if(!f)continue;
+    const ltr=parseFloat(document.getElementById('test_'+i+'_l')?.value)||0;
+    if(!ltr)continue;
+    const rate=S.rates[f.value]||0;
+    a.push({fuel:f.value.toUpperCase(),ltr,rate,amt:ltr*rate});
+  }
+  return a;
+}
+
 function calcPay(){
   let qr=0;
   qr+=parseFloat(document.getElementById('ufill_a').value)||0;
@@ -1062,11 +1137,19 @@ function calcPay(){
     const te=document.getElementById('oil_'+i+'_t');if(te)te.textContent='₹ '+fmt(amt);
     oil+=amt;
   }
+  let test=0;
+  for(let i=1;i<=testN;i++){
+    const f=document.getElementById('test_'+i+'_f');if(!f)continue;
+    const ltr=parseFloat(document.getElementById('test_'+i+'_l')?.value)||0;
+    const rate=S.rates[f.value]||0;
+    test+=ltr*rate;
+  }
   document.getElementById('tot_qr').textContent='₹ '+fmt(qr);
   document.getElementById('tot_cr').textContent='₹ '+fmt(cr);
   const oilEl=document.getElementById('tot_oil');if(oilEl)oilEl.textContent='₹ '+fmt(oil);
-  document.getElementById('tot_ded').textContent='₹ '+fmt(qr+cr);
-  document.getElementById('bdg_p').classList.toggle('show',qr>0||cr>0);
+  const testEl=document.getElementById('tot_test');if(testEl)testEl.textContent='₹ '+fmt(test);
+  document.getElementById('tot_ded').textContent='₹ '+fmt(qr+cr+test);
+  document.getElementById('bdg_p').classList.toggle('show',qr>0||cr>0||test>0);
 }
 
 function getQRTot(){let t=0;t+=parseFloat(document.getElementById('ufill_a').value)||0;t+=parseFloat(document.getElementById('ppe_a').value)||0;for(let i=1;i<=eqrN;i++){const e=document.getElementById('eqr_'+i+'_a');if(e)t+=parseFloat(e.value)||0;}return t;}
@@ -1176,13 +1259,14 @@ function saveCashDeposit(){
 }
 
 function clearAllPayments(){
-  if(!confirm('Clear all QR, Credit and Oil entries?')) return;
+  if(!confirm('Clear all QR, Credit, Testing and Oil entries?')) return;
   const ufill=document.getElementById('ufill_a'), ppe=document.getElementById('ppe_a');
   if(ufill)ufill.value=''; if(ppe)ppe.value='';
   for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
   for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
   addCredit();
   for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i);if(el)el.remove();} oilN=0;
+  for(let i=1;i<=testN;i++){const el=document.getElementById('test_'+i);if(el)el.remove();} testN=0;
   calcPay();
   showToast('🗑 Payments cleared');
 }
@@ -1237,8 +1321,8 @@ function closeShiftFinal(){
   if(!S.cashDeposits.length){
     if(!confirm('No cash deposits saved. Close shift anyway?'))return;
   }
-  const qrt=getQRTot(),crt=getCrTot(),oilt=getOilTot();
-  const cashExpected=tg-qrt-crt+oilt;
+  const qrt=getQRTot(),crt=getCrTot(),oilt=getOilTot(),testt=getTestTot();
+  const cashExpected=tg-qrt-crt-testt+oilt;
   const cashDeposited=getTotalCashDeposited();
   const diff=cashDeposited-cashExpected;
   const now=new Date();
@@ -1248,10 +1332,10 @@ function closeShiftFinal(){
     entryNum:S.shiftLog.length+1,
     date:document.getElementById('saleDate').value,
     savedTime,
-    dsm:S.dsm, mpds:S.selMPDs, nozzleData:byN, qrData:getQRData(), creditData:getCrData(), oilData:getOilData(),
+    dsm:S.dsm, mpds:S.selMPDs, nozzleData:byN, qrData:getQRData(), creditData:getCrData(), oilData:getOilData(), testingData:getTestData(),
     denomData:S.cashDeposits,
     rates:{...S.rates}, byFuel:bf,
-    totalLtr:tl, totalGross:tg, qrTotal:qrt, creditTotal:crt, oilTotal:oilt,
+    totalLtr:tl, totalGross:tg, qrTotal:qrt, creditTotal:crt, oilTotal:oilt, testTotal:testt,
     cashSales:cashExpected, cashDeposited:cashDeposited, cashInHand:cashDeposited, diff
   };
   S.shiftLog.push(rec);
@@ -1304,6 +1388,7 @@ function showCloseResult(rec){
     <div class="rrow"><span class="rl">Total Litres</span><span class="rv">${rec.totalLtr.toFixed(3)} L</span></div>
     <div class="rrow"><span class="rl">QR / UPI Deducted</span><span class="rv" style="color:#6D28D9">₹ ${fmt(rec.qrTotal)}</span></div>
     <div class="rrow"><span class="rl">Credits Deducted</span><span class="rv" style="color:#B91C1C">₹ ${fmt(rec.creditTotal)}</span></div>
+    ${rec.testTotal>0?`<div class="rrow"><span class="rl">🧪 Testing Deducted</span><span class="rv" style="color:#0369A1">₹ ${fmt(rec.testTotal)}</span></div>`:''}
     <div class="rrow"><span class="rl">Cash Deposits (${S.cashDeposits.length})</span><span class="rv" style="color:var(--cash)">₹ ${fmt(rec.cashDeposited)}</span></div>
     <button onclick="this.closest('[style*=position]').remove()" style="width:100%;margin-top:16px;background:linear-gradient(135deg,#1E6B8E,#155E75);color:#fff;border:none;padding:14px;border-radius:10px;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;cursor:pointer">✓ DONE</button>
   </div>`;
@@ -1318,6 +1403,7 @@ function carryForwardAndReset(){
   for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
   addCredit();
   for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i);if(el)el.remove();} oilN=0;
+  for(let i=1;i<=testN;i++){const el=document.getElementById('test_'+i);if(el)el.remove();} testN=0;
   S.cashDeposits=[];
   localStorage.removeItem('fdp_cash_deps');
   renderCashDepositLog();
