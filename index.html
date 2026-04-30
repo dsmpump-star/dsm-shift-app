@@ -676,10 +676,73 @@ function initApp(){
   localStorage.removeItem('fdp_shift'); localStorage.removeItem('fdp_cash_deps');
   purgeOldDSMLog();
   renderShiftLog();
-  // Show user name in header
   if(currentUser){
     const sub=document.querySelector('.hdr-sub');
     if(sub)sub.textContent='👤 '+currentUser;
+  }
+  // Watch for cashier deletions — sync to localStorage immediately
+  startDeletionListener();
+}
+
+/* Listen for any dsm_records deletions made by cashier and clean localStorage */
+let deletionListener = null;
+function startDeletionListener(){
+  if(deletionListener) deletionListener();
+  // Watch today + yesterday to catch recent deletions
+  const dates=[];
+  const now=new Date();
+  for(let i=0;i<2;i++){
+    const d=new Date(now); d.setDate(d.getDate()-i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  dates.forEach(date=>{
+    db.collection('dsm_records').where('date','==',date)
+      .onSnapshot(snap=>{
+        // Check for removed docs
+        snap.docChanges().forEach(change=>{
+          if(change.type==='removed'){
+            const deletedId=change.doc.id;
+            purgeLocalByFirestoreId(deletedId);
+          }
+        });
+      }, ()=>{});
+  });
+}
+
+function purgeLocalByFirestoreId(fid){
+  let changed=false;
+  // Remove from fdp_shift (current shift log)
+  const shift=JSON.parse(localStorage.getItem('fdp_shift')||'[]');
+  const newShift=shift.filter(r=>r._firestoreId!==fid);
+  if(newShift.length!==shift.length){
+    localStorage.setItem('fdp_shift',JSON.stringify(newShift));
+    S.shiftLog=newShift;
+    changed=true;
+  }
+  // Remove from fdp_allshifts (past shift archive)
+  const allShifts=JSON.parse(localStorage.getItem('fdp_allshifts')||'[]');
+  const newAll=allShifts.map(archive=>{
+    const filtered=archive.entries.filter(r=>r._firestoreId!==fid);
+    return {...archive,entries:filtered};
+  }).filter(a=>a.entries.length>0);
+  if(JSON.stringify(newAll)!==JSON.stringify(allShifts)){
+    localStorage.setItem('fdp_allshifts',JSON.stringify(newAll));
+    S.allShifts=newAll;
+    changed=true;
+  }
+  // Remove from fdp_dsmlog (7-day log)
+  const dsmlog=JSON.parse(localStorage.getItem('fdp_dsmlog')||'[]');
+  const newLog=dsmlog.filter(r=>r._firestoreId!==fid);
+  if(newLog.length!==dsmlog.length){
+    localStorage.setItem('fdp_dsmlog',JSON.stringify(newLog));
+    changed=true;
+  }
+  if(changed){
+    renderShiftLog();
+    // Refresh DSM log if on that tab
+    const dsmLogPg=document.getElementById('pg_dsmlog');
+    if(dsmLogPg&&dsmLogPg.classList.contains('active')) renderDSMLog();
+    showToast('🗑 Shift removed by cashier');
   }
 }
 
@@ -1244,18 +1307,45 @@ function clearDenomInputs(){
   showToast('🗑 Denominations cleared');
 }
 
-/* SAVE CASH DEPOSIT — called each time DSM deposits cash */
+/* SAVE CASH DEPOSIT — writes live to Firestore so cashier sees it immediately */
 function saveCashDeposit(){
   const total=getCashTot();
   if(total<=0){showToast('Enter denomination amounts','err');return;}
+  if(!S.dsm){showToast('Select a DSM first before saving cash','err');showTab('setup');return;}
+
   const now=new Date();
   const ts=now.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
-  const dep={total,denoms:getDenomData(),ts,date:now.toISOString().split('T')[0]};
+  const date=document.getElementById('saleDate').value||now.toISOString().split('T')[0];
+
+  // Capture denoms BEFORE clearing inputs
+  const denomSnapshot=getDenomData();
+  const dep={total,denoms:denomSnapshot,ts,date};
   S.cashDeposits.push(dep);
   localStorage.setItem('fdp_cash_deps',JSON.stringify(S.cashDeposits));
+
   clearDenomInputs();
   renderCashDepositLog();
-  showToast('💰 ₹'+fmt(total)+' deposited at '+ts);
+  showToast('💰 ₹'+fmt(total)+' saved · syncing…');
+
+  // Write to Firestore live_cash — use captured denoms, correct DSM name
+  db.collection('live_cash').add({
+    dsm: S.dsm,
+    date,
+    total,
+    denoms: denomSnapshot,
+    ts,
+    savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    savedBy: currentUser||'unknown'
+  }).then(docRef=>{
+    // Store Firestore doc ID so we can delete it later if needed
+    const idx=S.cashDeposits.length-1;
+    S.cashDeposits[idx]._firestoreId=docRef.id;
+    localStorage.setItem('fdp_cash_deps',JSON.stringify(S.cashDeposits));
+    showToast('💰 ₹'+fmt(total)+' saved at '+ts);
+  }).catch(e=>{
+    console.warn('Live cash sync failed',e);
+    showToast('💰 ₹'+fmt(total)+' saved locally (sync failed)','err');
+  });
 }
 
 function clearAllPayments(){
@@ -1304,9 +1394,15 @@ function renderCashDepositLog(){
 }
 
 function deleteCashDeposit(i){
+  const dep=S.cashDeposits[i];
+  // Remove from Firestore live_cash if we have its ID
+  if(dep&&dep._firestoreId){
+    db.collection('live_cash').doc(dep._firestoreId).delete().catch(e=>console.warn('live_cash delete failed',e));
+  }
   S.cashDeposits.splice(i,1);
   localStorage.setItem('fdp_cash_deps',JSON.stringify(S.cashDeposits));
   renderCashDepositLog();
+  showToast('🗑 Deposit removed');
 }
 
 function getTotalCashDeposited(){
