@@ -500,6 +500,13 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
       <div id="nozzleSelCont"></div>
     </div>
   </div>
+  <div class="card">
+    <div class="ch red">🗑 Clear Device Data</div>
+    <div class="cb">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Clears all shift data, meters, cash and logs from this device. Rates and DSM names are kept. Use if old test data is showing.</p>
+      <button onclick="clearAllDeviceData()" style="width:100%;background:#FFF5F5;border:2px solid #FECACA;color:#DC2626;padding:13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">🗑 Clear All Shift Data</button>
+    </div>
+  </div>
   <div class="bb"><button class="btn-n" onclick="gotoMeters()">PROCEED TO METERS →</button></div>
 </div>
 
@@ -650,7 +657,13 @@ hr.dl{border:none;border-top:1px dashed var(--border);margin:10px 0}
   <div class="modal">
     <div class="modal-ttl">ADD NEW DSM <button class="modal-x" onclick="closeModal('dsmMod')">✕</button></div>
     <div class="field"><label>Full Name</label><input type="text" id="newDSM" placeholder="Enter DSM name"></div>
-    <button class="btn-n" style="width:100%" onclick="confirmAddDSM()">ADD DSM</button>
+    <div class="field">
+      <label>4-Digit PIN</label>
+      <input type="number" id="newDSMPin" placeholder="e.g. 5678" maxlength="4" inputmode="numeric"
+        style="letter-spacing:8px;font-size:22px;font-weight:700;text-align:center">
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">DSM will use this PIN to log in</div>
+    </div>
+    <button class="btn-n" style="width:100%" onclick="confirmAddDSM()">ADD DSM & SAVE PIN</button>
   </div>
 </div>
 
@@ -799,13 +812,37 @@ function rebuildDSMDrop(){
   S.dsmList.forEach(d=>{ const o=document.createElement('option'); o.value=o.textContent=d.name; sel.appendChild(o); });
   if(cur) sel.value=cur;
 }
-function confirmAddDSM(){
+async function confirmAddDSM(){
   const nm=document.getElementById('newDSM').value.trim();
+  const pin=document.getElementById('newDSMPin').value.trim();
   if(!nm){showToast('Enter a name','err');return;}
-  if(S.dsmList.find(d=>d.name.toLowerCase()===nm.toLowerCase())){showToast('Already exists','err');return;}
-  S.dsmList.push({name:nm}); persist(); rebuildDSMDrop();
+  if(!pin||pin.length!==4||isNaN(pin)){showToast('Enter a valid 4-digit PIN','err');return;}
+  if(S.dsmList.find(d=>d.name.toLowerCase()===nm.toLowerCase())){showToast('DSM already exists','err');return;}
+
+  // Check if PIN already taken
+  try{
+    const existing=await db.collection('access_list').doc(pin).get();
+    if(existing.exists){showToast('PIN '+pin+' already in use — choose another','err');return;}
+  }catch(e){}
+
+  // Save to Firestore access_list
+  try{
+    await db.collection('access_list').doc(pin).set({
+      name: nm,
+      active: true,
+      role: 'dsm',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('✅ '+nm+' added · PIN: '+pin);
+  }catch(e){
+    showToast('Saved locally — cloud sync failed','err');
+  }
+
+  S.dsmList.push({name:nm,pin}); persist(); rebuildDSMDrop();
+  document.getElementById('newDSM').value='';
+  document.getElementById('newDSMPin').value='';
   document.getElementById('dsmSel').value=nm; onDSMSelect();
-  closeModal('dsmMod'); showToast('✅ DSM added: '+nm);
+  closeModal('dsmMod');
 }
 function onDSMSelect(){
   const nm=document.getElementById('dsmSel').value; S.dsm=nm;
@@ -1636,6 +1673,8 @@ function renderShiftLog(){
       <div style="font-size:12px;margin-top:6px">Close a shift to see entries here</div>
     </div>`;
   }
+  // Always show clear all button so old data can be wiped
+  html+=`<button onclick="clearAllLocalData()" style="width:100%;margin-top:12px;background:#FFF5F5;border:2px solid #FECACA;color:#DC2626;padding:13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">🗑 Clear All Local Shift Data</button>`;
   if(S.allShifts.length){
     html+=`<div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;margin:18px 0 10px">PAST SHIFTS</div>`;
     S.allShifts.forEach((shift,si)=>{
@@ -1670,6 +1709,29 @@ function togglePastShift(idx){
   const open=el.style.display==='none';
   el.style.display=open?'block':'none';
   if(arrow)arrow.textContent=open?'▲':'▼';
+}
+
+function clearAllLocalData(){
+  if(!confirm('Clear ALL local shift data on this device?\n\nThis removes all shift logs, past shifts and cash data stored here. Firebase records are NOT deleted.')) return;
+  ['fdp_shift','fdp_allshifts','fdp_cash_deps','fdp_dsmlog'].forEach(k=>localStorage.removeItem(k));
+  S.shiftLog=[]; S.allShifts=[]; S.cashDeposits=[];
+  S.meters={}; S.dsm=''; S.selMPDs=[]; S.selNozzles=[];
+  document.getElementById('dsmSel').value='';
+  document.querySelectorAll('.mpd-card').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('ufill_a').value=''; document.getElementById('ppe_a').value='';
+  for(let i=1;i<=eqrN;i++){const el=document.getElementById('eqr_'+i);if(el)el.remove();} eqrN=0;
+  for(let i=1;i<=crN;i++){const el=document.getElementById('cred_'+i);if(el)el.remove();} crN=0;
+  addCredit();
+  for(let i=1;i<=oilN;i++){const el=document.getElementById('oil_'+i);if(el)el.remove();} oilN=0;
+  for(let i=1;i<=testN;i++){const el=document.getElementById('test_'+i);if(el)el.remove();} testN=0;
+  clearDenomInputs(); renderCashDepositLog(); calcPay();
+  const mc=document.getElementById('metersCont'); if(mc)mc.innerHTML='';
+  document.getElementById('bdg_sh').textContent=''; document.getElementById('bdg_sh').classList.remove('show');
+  document.getElementById('bdg_m').classList.remove('show');
+  document.getElementById('bdg_p').classList.remove('show');
+  document.getElementById('bdg_c').classList.remove('show');
+  renderShiftLog(); showTab('setup');
+  showToast('✅ All local data cleared');
 }
 
 function resetShift(){
